@@ -1,5 +1,52 @@
+# Python
 *.pyc
 __pycache__/
-db.sqlite3
+
+# Environment variables (keep these excluded for security)
 .env
+.env.*
+
+# Virtual environment (keep this excluded as it's large and environment-specific)
 venv/
+env/
+ENV/
+
+# IDE specific files (optional to exclude)
+.vscode/
+.idea/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+
+# Keep these commented out if you want to include them
+# /static/
+# /media/
+
+# Database files (be cautious with these, especially in production)
+# *.sqlite3
+
+# Dependency directories (keep this excluded as it's large and can be recreated)
+node_modules/
+
+# Compiled Python files
+*.pyc
+*.pyo
+*.pyd
+
+# Python cache
+__pycache__/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version

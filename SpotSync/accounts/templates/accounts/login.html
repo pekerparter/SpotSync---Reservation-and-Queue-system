@@ -1,0 +1,56 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    {% load static %}
+    <div class="flex items-center justify-center min-h-screen bg-gray-100">
+        <div class="flex bg-white shadow-md rounded-lg overflow-hidden">
+            <!-- Image Section -->
+            <div class="p-8 bg-gray-200">
+                <img src="{% static 'accounts/images/online_reservations.webp' %}" alt="Online Reservations"
+                    class="w-48 mx-auto mb-4">
+            </div>
+            <!-- Form Section -->
+            <div class="p-8 w-96">
+                <h2 class="text-2xl font-bold text-center mb-6">Login</h2>
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-4">
+                        <input type="email" name="username" placeholder="Email"
+                            class="w-full px-4 py-2 border rounded-md focus:outline-none">
+                    </div>
+                    <div class="mb-4">
+                        <input type="password" name="password" placeholder="Password"
+                            class="w-full px-4 py-2 border rounded-md focus:outline-none">
+                    </div>
+                    {% if messages %}
+                    <div class="mb-4">
+                        {% for message in messages %}
+                        <div
+                            class="{% if message.tags == 'success' %}bg-green-100 text-green-800{% else %}bg-red-100 text-red-800{% endif %} p-2 rounded">
+                            {{ message }}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    <button type="submit" class="w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600">
+                        Sign In
+                    </button>
+                </form>
+                <p class="mt-4 text-center">
+                    <a href="{% url 'password_reset' %}" class="text-blue-500">Forgot Password?</a>
+                </p>
+                <p class="mt-4 text-center">Don't have an account? <a href="{% url 'register' %}"
+                        class="text-blue-500">Sign
+                        up</a></p>
+            </div>
+        </div>
+    </div>
+
+</body>
+
+</html>

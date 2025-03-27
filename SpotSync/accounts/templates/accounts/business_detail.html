@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mx-auto mt-8 p-4">
+    <div class="flex items-center justify-between mb-4">
+        <h1 class="text-3xl font-bold">{{ business.name }}</h1>
+    </div>
+
+    <div class="bg-white shadow-md rounded-lg overflow-hidden">
+        <div class="md:flex">
+            <div class="md:flex-shrink-0">
+                {% if business.image %}
+                    <img class="h-48 w-full object-cover md:w-48" src="{{ business.image.url }}" alt="{{ business.name }}">
+                {% else %}
+                    <div class="h-48 w-full md:w-48 bg-gray-300 flex items-center justify-center">
+                        <span class="text-gray-500">No image</span>
+                    </div>
+                {% endif %}
+            </div>
+            <div class="p-8">
+                <div class="uppercase tracking-wide text-sm text-indigo-500 font-semibold">
+                    {% for category in business.categories.all %}
+                        {{ category.name }}{% if not forloop.last %}, {% endif %}
+                    {% endfor %}
+                </div>
+                <p class="mt-2 text-gray-500">{{ business.address }}</p>
+                <p class="mt-2 text-gray-500">{{ business.phone_number }}</p>
+
+                <div class="mt-4">
+                    {% if 'Waiting List' in business.categories.all|stringformat:"s" %}
+                        <a href="{% url 'waiting_list' business.id %}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mr-2">
+                            Join Waiting List
+                        </a>
+                    {% endif %}
+
+                    {% if 'Reservation' in business.categories.all|stringformat:"s" %}
+                        <a href="{% url 'reservation' business.id %}" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded mr-2">
+                            Make Reservation
+                        </a>
+                    {% endif %}
+
+                    {% if 'Appointment' in business.categories.all|stringformat:"s" %}
+                        <a href="{% url 'appointment' business.id %}" class="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded">
+                            Book Appointment
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mx-auto mt-8 p-4">
+    <h1 class="text-3xl font-bold mb-4">{{ business.name }} - Choose a Service</h1>
+
+    <div class="bg-white shadow-md rounded-lg overflow-hidden">
+        <div class="md:flex">
+            <div class="md:flex-shrink-0">
+                {% if business.image %}
+                    <img class="h-48 w-full object-cover md:w-48" src="{{ business.image.url }}" alt="{{ business.name }}">
+                {% else %}
+                    <div class="h-48 w-full md:w-48 bg-gray-300 flex items-center justify-center">
+                        <span class="text-gray-500 text-center px-4">No image available</span>
+                    </div>
+                {% endif %}
+            </div>
+            <div class="p-8">
+                <h2 class="text-xl font-semibold mb-2">{{ business.name }}</h2>
+                <p class="text-gray-600 mb-2"><strong>Address:</strong> {{ business.address }}</p>
+                <p class="text-gray-600 mb-4"><strong>Phone:</strong> {{ business.phone_number }}</p>
+                
+                <h3 class="text-lg font-semibold mb-2">Available Services:</h3>
+                <div class="space-y-2">
+                    {% for url_name, category_name in categories %}
+                        <a href="{% url url_name business.id %}" class="block bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                            {{ category_name }}
+                        </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

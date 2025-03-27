@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mx-auto px-4">
+    <h1 class="text-2xl font-bold mb-4">View All - {{ category.name }}</h1>
+
+    <div class="mb-4">
+        <input type="text" id="businessSearch" placeholder="Business Name" class="w-full p-2 border rounded">
+    </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 business-grid">
+        {% for business in businesses %}
+        <div class="bg-white rounded shadow p-2 business-card">
+            <a href="{% url 'business_detail' business.id %}">
+                {% if business.image %}
+                    <img src="{{ business.image.url }}" alt="{{ business.name }}" class="w-full h-32 object-cover mb-2">
+                {% else %}
+                    <div class="w-full h-32 bg-gray-200 flex items-center justify-center mb-2">
+                        <span class="text-gray-500">No image</span>
+                    </div>
+                {% endif %}
+                <p class="text-center business-name">{{ business.name }}</p>
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="none-found hidden text-center text-gray-500 mt-4">
+        None found
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('businessSearch');
+    const businessCards = document.querySelectorAll('.business-card');
+    const noneFoundMessage = document.querySelector('.none-found');
+    const businessGrid = document.querySelector('.business-grid');
+
+    searchInput.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase();
+        let foundMatch = false;
+
+        businessCards.forEach(card => {
+            const businessName = card.querySelector('.business-name').textContent.toLowerCase();
+            if (businessName.includes(searchTerm)) {
+                card.style.display = '';
+                foundMatch = true;
+            } else {
+                card.style.display = 'none';
+            }
+        });
+
+        if (foundMatch || searchTerm === '') {
+            businessGrid.style.display = '';
+            noneFoundMessage.classList.add('hidden');
+        } else {
+            businessGrid.style.display = 'none';
+            noneFoundMessage.classList.remove('hidden');
+        }
+    });
+});
+</script>
+{% endblock %}

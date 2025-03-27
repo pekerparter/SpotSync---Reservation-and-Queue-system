@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mx-auto mt-8 p-4">
+    <h1 class="text-3xl font-bold mb-4">{{ business.name }} - Waiting List</h1>
+
+    <div class="bg-white shadow-md rounded-lg overflow-hidden">
+            <div class="md:flex">
+                <div class="md:flex-shrink-0">
+                    {% if business.image %}
+                        <img class="h-48 w-full object-cover md:w-48" src="{{ business.image.url }}" alt="{{ business.name }}">
+                    {% else %}
+                        <div class="h-48 w-full md:w-48 bg-gray-300 flex items-center justify-center">
+                            <span class="text-gray-500 text-center px-4">No image available</span>
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="p-8">
+                    <h2 class="text-xl font-semibold mb-2">{{ business.name }}</h2>
+                    <p class="text-gray-600 mb-2"><strong>Address:</strong> {{ business.address }}</p>
+                    <p class="text-gray-600 mb-4"><strong>Phone:</strong> {{ business.phone_number }}</p>
+                    <p class="mb-2"><strong>People in queue:</strong> {{ business.people_in_queue }}</p>
+                    <p class="mb-4"><strong>Estimated wait time:</strong> {{ business.estimated_wait_time }} mins</p>
+
+                    {% if user_in_queue %}
+                        <button id="removeFromQueue" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
+                            Remove from queue
+                        </button>
+                    {% else %}
+                        <button id="addToQueue" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                            Add to queue
+                        </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const addToQueueBtn = document.getElementById('addToQueue');
+    const removeFromQueueBtn = document.getElementById('removeFromQueue');
+
+    if (addToQueueBtn) {
+        addToQueueBtn.addEventListener('click', function() {
+            fetch('{% url "add_to_queue" business.id %}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                },
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert('You have been added to the queue!');
+                    location.reload();
+                } else {
+                    alert(data.message);
+                }
+            });
+        });
+    }
+
+    if (removeFromQueueBtn) {
+        removeFromQueueBtn.addEventListener('click', function() {
+            if (confirm('Are you sure you want to exit the queue?')) {
+                fetch('{% url "remove_from_queue" business.id %}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': '{{ csrf_token }}',
+                    },
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        alert('You have been removed from the queue.');
+                        location.reload();
+                    } else {
+                        alert(data.message);
+                    }
+                });
+            }
+        });
+    }
+});
+</script>
+
+{% endblock %}

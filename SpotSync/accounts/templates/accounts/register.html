@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - SpotSync</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+    {% load static %}
+    <div class="flex items-center justify-center min-h-screen">
+        <div class="flex w-4/5 max-w-4xl bg-white shadow-lg rounded-lg overflow-hidden">
+            <!-- Left Image Section -->
+            <div class="w-1/2 bg-gray-200 flex items-center justify-center">
+                <img src="{% static 'accounts/images/online_reservations.webp' %}" alt="Online Reservations" class="w-3/4">
+            </div>
+            <!-- Right Form Section -->
+            <div class="w-1/2 p-8">
+                <h2 class="text-3xl font-bold text-center mb-6">Register</h2>
+
+                <!-- Display Messages -->
+                {% if messages %}
+                <div class="mb-4">
+                    {% for message in messages %}
+                    <div class="{% if message.tags == 'success' %}bg-green-100 text-green-800{% else %}bg-red-100 text-red-800{% endif %} p-2 rounded">
+                        {{ message }}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <!-- Render Non-Field Errors -->
+                {% if form.non_field_errors %}
+                <div class="bg-red-100 text-red-800 p-2 rounded mb-4">
+                    {% for error in form.non_field_errors %}
+                    <p>{{ error }}</p>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <!-- Registration Form -->
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    {% for field in form.visible_fields %}
+                    <div class="mb-4">
+                        <label for="{{ field.id_for_label }}" class="block text-sm font-semibold text-gray-600">
+                            {{ field.label }}
+                        </label>
+                        {{ field }}
+                        {% if field.errors %}
+                        <div class="text-red-600 text-sm mt-1">
+                            {% for error in field.errors %}
+                            <p>{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+
+                    <button type="submit" class="w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition-colors duration-300">
+                        Sign up
+                    </button>
+                </form>
+                
+                <p class="mt-4 text-center text-gray-600">Already have an account? 
+                    <a href="{% url 'custom_login' %}" class="text-blue-500 hover:underline">Sign in</a>
+                </p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

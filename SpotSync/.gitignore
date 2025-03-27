@@ -50,3 +50,6 @@ __pycache__/
 
 # pyenv
 .python-version
+
+#include data dump
+!pgsqldata.json

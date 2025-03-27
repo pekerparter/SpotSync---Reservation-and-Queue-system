@@ -53,3 +53,4 @@ __pycache__/
 
 #include data dump
 !pgsqldata.json
+!pgsqldata.sql

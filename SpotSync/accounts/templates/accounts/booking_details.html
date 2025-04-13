@@ -1,0 +1,108 @@
+{% extends 'base.html' %}
+
+{% block title %}Booking Details - {{ booking.business.name }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <h1 class="text-3xl font-bold text-gray-800 mb-6">Booking Details</h1>
+
+    <div class="bg-white rounded-lg shadow-md overflow-hidden">
+        <div class="md:flex">
+            <div class="md:flex-shrink-0">
+                {% if booking.business.image %}
+                <img class="h-48 w-full object-cover md:w-48" src="{{ booking.business.image.url }}"
+                    alt="{{ booking.business.name }}">
+                {% else %}
+                <div class="h-48 w-full md:w-48 bg-gray-300 flex items-center justify-center">
+                    <span class="text-gray-500 text-2xl font-bold">{{ booking.business.name|slice:":1"|upper }}</span>
+                </div>
+                {% endif %}
+            </div>
+            <div class="p-8">
+                <div class="uppercase tracking-wide text-sm text-indigo-500 font-semibold">{{ booking_type|title }}
+                </div>
+                <h2 class="block mt-1 text-lg leading-tight font-medium text-black">{{ booking.business.name }}</h2>
+                <p class="mt-2 text-gray-500">{{ booking.business.address }}</p>
+                <p class="text-gray-500">{{ booking.business.phone_number }}</p>
+
+                <div class="mt-4">
+                    <p class="text-sm text-gray-600">Date: {{ booking.date|date:"F d, Y" }}</p>
+                    <p class="text-sm text-gray-600">Time: {{ booking.time }}</p>
+                    {% if booking_type == 'reservation' %}
+                    <p class="text-sm text-gray-600">Option: {{ booking.option }}</p>
+                    {% elif booking_type == 'appointment' %}
+                    <p class="text-sm text-gray-600">Reason: {{ booking.reason }}</p>
+                    {% endif %}
+                    <p class="text-sm text-gray-600">Booked on: {{ booking.created_at|date:"F d, Y H:i" }}</p>
+                    <p class="text-sm text-gray-600">Status:
+                        <span class="px-2 py-1 rounded-full text-xs font-semibold
+                            {% if booking.status == 'booked' or booking.status == 'in_queue' %}
+                                bg-green-200 text-green-800
+                            {% elif booking.status == 'done' %}
+                                bg-gray-200 text-gray-800
+                            {% elif booking.status == 'cancelled' %}
+                                bg-red-200 text-red-800
+                            {% else %}
+                                bg-blue-200 text-blue-800
+                            {% endif %}
+                        ">
+                            {{ booking.status|title|default:"Booked" }}
+                        </span>
+                    </p>
+                </div>
+
+                {% if booking.status|lower != 'cancelled' and booking.status|lower != 'done' %}
+                <div class="mt-6">
+                    <button class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
+                        onclick="cancelBooking('{{ booking_type }}', {{ booking.id }})">
+                        Cancel {{ booking_type|title }}
+                    </button>
+                </div>
+                {% else %}
+                <div class="mt-6">
+                    <p class="text-sm text-gray-600">This booking cannot be cancelled.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function cancelBooking(bookingType, bookingId) {
+        if (confirm('Are you sure you want to cancel this booking?')) {
+            fetch(`/accounts/cancel-booking/${bookingType}/${bookingId}/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'Content-Type': 'application/json',
+                },
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        alert(data.message);
+                        // Check if a redirect URL is provided, otherwise use a default
+                        if (data.redirect_url) {
+                            window.location.href = data.redirect_url;
+                        } else {
+                            // Default redirect to the user's bookings page or home page
+                            window.location.href = '{% url "my_reservations" %}';  // Replace with your actual URL name
+                        }
+                    } else {
+                        alert('Error: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while cancelling the booking. Please try again.');
+                });
+        }
+    }
+</script>
+{% endblock %}

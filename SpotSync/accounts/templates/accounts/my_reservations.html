@@ -1,8 +1,149 @@
 {% extends 'base.html' %}
 
-{% block title %}My Reservations{% endblock %}
+{% block title %}My Bookings{% endblock %}
 
 {% block content %}
-<h1 class="text-3xl font-bold text-gray-800">My Reservations</h1>
-<p>This is the my reservations page. Content will be added later.</p>
+<div class="container mx-auto px-4 py-8">
+    <h1 class="text-3xl font-bold text-gray-800 mb-6">My Bookings</h1>
+
+    <div class="bg-blue-100 rounded-lg shadow-md p-6">
+        <h2 class="text-2xl font-semibold text-gray-700 mb-4">Latest Bookings</h2>
+
+        <div class="space-y-4">
+            {% for booking in bookings %}
+            <div class="bg-white rounded-lg shadow p-4 flex items-center justify-between hover:bg-gray-50 transition duration-150 ease-in-out cursor-pointer"
+            onclick="window.location.href='{% url 'booking_details' booking_type=booking.booking_type booking_id=booking.id %}'">
+                <div class="flex items-center space-x-4">
+                    <div class="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
+                        {% if booking.business.image %}
+                            <img src="{{ booking.business.image.url }}" alt="{{ booking.business.name }}" class="w-full h-full object-cover">
+                        {% else %}
+                            <span class="text-gray-600 font-bold">{{ booking.business.name|slice:":3"|upper }}</span>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <p class="font-semibold text-gray-800">{{ booking.business.name }}</p>
+                        <p class="text-sm text-gray-600">{{ booking.date|date:"m/d/Y" }} at {{ booking.time }}</p>
+                        <p class="text-xs text-gray-500">Booked on: {{ booking.created_at|date:"m/d/Y H:i" }}</p>
+                        {% if booking.booking_type == 'reservation' %}
+                            <p class="text-sm text-gray-600">Option: {{ booking.option }}</p>
+                        {% elif booking.booking_type == 'appointment' %}
+                            <p class="text-sm text-gray-600">Reason: {{ booking.reason }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="flex flex-col items-end space-y-2">
+                    <div class="text-right">
+                        <p class="text-sm text-gray-600">Status:</p>
+                        <span class="px-2 py-1 rounded-full text-xs font-semibold
+                            {% if booking.status == 'booked' or booking.status == 'in_queue' %}
+                                bg-green-200 text-green-800
+                            {% elif booking.status == 'done' %}
+                                bg-gray-200 text-gray-800
+                            {% elif booking.status == 'cancelled' %}
+                                bg-red-200 text-red-800
+                            {% endif %}
+                        ">
+                            {{ booking.status|title|cut:"_"|default:" " }}
+                        </span>
+                    </div>
+                    {% if booking.can_cancel %}
+                    <button class="cancel-booking bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded" 
+                            data-booking-id="{{ booking.id }}" 
+                            data-booking-type="{{ booking.booking_type }}"
+                            onclick="event.stopPropagation();">
+                        Cancel
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+            {% empty %}
+            <p class="text-gray-600">You have no bookings yet.</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal for cancellation confirmation -->
+<div id="cancelModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center">
+    <div class="bg-white p-8 rounded-lg shadow-xl">
+        <h3 class="text-xl font-bold mb-4">Are you sure you want to cancel?</h3>
+        <div class="flex justify-end space-x-4">
+            <button id="confirmCancel" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded">Cancel Booking</button>
+            <button id="closeModal" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded">Close</button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const cancelModal = document.getElementById('cancelModal');
+    const confirmCancelButton = document.getElementById('confirmCancel');
+    const closeModalButton = document.getElementById('closeModal');
+    let currentBookingId;
+    let currentBookingType;
+
+    function showModal() {
+        console.log('Showing modal');
+        cancelModal.style.display = 'flex';
+    }
+
+    function hideModal() {
+        console.log('Hiding modal');
+        cancelModal.style.display = 'none';
+    }
+
+    // Directly target cancel buttons
+    document.querySelectorAll('.cancel-booking').forEach(button => {
+        button.addEventListener('click', function(event) {
+            console.log('Cancel button clicked');
+            event.preventDefault();
+            event.stopPropagation();
+            currentBookingId = this.dataset.bookingId;
+            currentBookingType = this.dataset.bookingType;
+            showModal();
+        });
+    });
+
+    closeModalButton.addEventListener('click', hideModal);
+
+    confirmCancelButton.addEventListener('click', function() {
+        console.log('Confirm cancel clicked');
+        const url = `/accounts/cancel-booking/${currentBookingType}/${currentBookingId}/`;
+        
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();  // Refresh the page to show updated bookings
+            } else {
+                alert('Failed to cancel booking: ' + data.message);
+                console.error('Cancellation failed:', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred. Please try again.');
+        })
+        .finally(hideModal);
+    });
+
+    // Close modal if clicking outside of it
+    cancelModal.addEventListener('click', function(event) {
+        if (event.target === cancelModal) {
+            hideModal();
+        }
+    });
+
+    // Initial setup
+    hideModal();
+    console.log('Script loaded');
+})();
+</script>
 {% endblock %}

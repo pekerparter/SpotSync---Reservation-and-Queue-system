@@ -20,6 +20,15 @@ urlpatterns = [
     path('business/<int:business_id>/remove-from-queue/', views.remove_from_queue, name='remove_from_queue'),
     path('business/<int:business_id>/waiting-list/', views.waiting_list, name='waiting_list'),
     path('business/<int:business_id>/reservation/', views.reservation, name='reservation'),
-    path('business/<int:business_id>/appointment/', views.appointment, name='appointment'),
+    path('appointment/<int:business_id>/', views.appointment, name='appointment'),
+    path('book_appointment/<int:business_id>/', views.book_appointment, name='book_appointment'),
+    path('reservation/<int:business_id>/', views.reservation, name='reservation'),
+    path('make_reservation/<int:business_id>/', views.make_reservation, name='make_reservation'),
+    path('get_available_appointment_slots/<int:business_id>/', views.get_available_appointment_slots, name='get_available_appointment_slots'),
+    path('get_available_reservation_slots/<int:business_id>/', views.get_available_reservation_slots, name='get_available_reservation_slots'),
+    path('cancel-booking/<str:booking_type>/<int:booking_id>/', views.cancel_booking, name='cancel_booking'),
+    path('booking/<str:booking_type>/<int:booking_id>/', views.booking_details, name='booking_details'),
 ]
+
+
 

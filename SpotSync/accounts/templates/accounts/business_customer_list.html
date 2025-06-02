@@ -1,0 +1,406 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <h1 class="text-4xl font-bold mb-8 text-center text-gray-800">{{ business.name }} - Customer List</h1>
+    <div class="flex justify-center space-x-4 mb-8">
+        <button onclick="showBookings('active')" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+            Active Bookings
+        </button>
+        <button onclick="showBookings('done')" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
+            Done Bookings
+        </button>
+        <button onclick="showBookings('cancelled')" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
+            Cancelled Bookings
+        </button>
+    </div>
+    {% for booking_type, bookings in booking_data.items %}
+    {% if bookings %}
+    <div class="mb-12 bg-white shadow-md rounded-lg overflow-hidden">
+        <div class="bg-gray-100 px-6 py-4 cursor-pointer" onclick="toggleSection('{{ booking_type }}')">
+            <h2 class="text-2xl font-semibold text-gray-800 flex items-center justify-between">
+                {{ booking_type|title }}
+                <svg class="w-6 h-6 transform transition-transform duration-200" id="{{ booking_type }}-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+            </h2>
+        </div>
+        <div id="{{ booking_type }}-content" class="hidden">
+            <table class="w-full">
+                <thead>
+                    <tr class="bg-gray-200">
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider cursor-pointer" onclick="sortTable(0, '{{ booking_type }}')">
+                            Date & Time <span class="sort-indicator"></span>
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider cursor-pointer" onclick="sortTable(1, '{{ booking_type }}')">
+                            Customer <span class="sort-indicator"></span>
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider cursor-pointer" onclick="sortTable(2, '{{ booking_type }}')">
+                            Contact <span class="sort-indicator"></span>
+                        </th>
+                        {% if booking_type == 'reservations' %}
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider cursor-pointer" onclick="sortTable(3, '{{ booking_type }}')">
+                            Option <span class="sort-indicator"></span>
+                        </th>
+                        {% elif booking_type == 'appointments' %}
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider cursor-pointer" onclick="sortTable(3, '{{ booking_type }}')">
+                            Reason <span class="sort-indicator"></span>
+                        </th>
+                        {% elif booking_type == 'queues' %}
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider cursor-pointer" onclick="sortTable(3, '{{ booking_type }}')">
+                            Position <span class="sort-indicator"></span>
+                        </th>
+                        {% endif %}
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider cursor-pointer" onclick="sortTable(4, '{{ booking_type }}')">
+                            Status <span class="sort-indicator"></span>
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for booking in bookings %}
+                    <tr data-booking-id="{{ booking.id }}">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">{{ booking.date }}</div>
+                            <div class="text-sm text-gray-500">{{ booking.time }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900">{{ booking.user.first_name }} {{ booking.user.last_name }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">{{ booking.user.email }}</div>
+                            <div class="text-sm text-gray-500">{{ booking.user.phone_number }}</div>
+                        </td>
+                        {% if booking_type == 'reservations' %}
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ booking.option }}</td>
+                        {% elif booking_type == 'appointments' %}
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ booking.reason }}</td>
+                        {% elif booking_type == 'queues' %}
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ booking.position }}</td>
+                        {% endif %}
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                {% if booking.status == 'booked' or booking.status == 'in_queue' %}
+                                    bg-green-100 text-green-800
+                                {% elif booking.status == 'cancelled' %}
+                                    bg-red-100 text-red-800
+                                {% elif booking.status == 'done' %}
+                                    bg-gray-100 text-gray-800
+                                {% else %}
+                                    bg-yellow-100 text-yellow-800
+                                {% endif %}">
+                                {{ booking.status|title }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            {% if booking.status == 'booked' or booking.status == 'in_queue' %}
+                            <button onclick="updateStatus('{{ booking_type }}', {{ booking.id }}, 'cancelled')" class="text-red-600 hover:text-red-900 mr-2">Cancel</button>
+                            <button onclick="updateStatus('{{ booking_type }}', {{ booking.id }}, 'done')" class="text-green-600 hover:text-green-900">Mark as Done</button>
+                            {% elif booking.status == 'cancelled' or booking.status == 'done' %}
+                            <button onclick="reactivateBooking('{{ booking_type }}', {{ booking.id }})" class="text-blue-600 hover:text-blue-900">Reactivate</button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+
+    {% if booking_data.reservations|length == 0 and booking_data.appointments|length == 0 and booking_data.queues|length == 0 %}
+    <p class="text-xl text-gray-600 text-center">No bookings found for this business.</p>
+    {% endif %}
+</div>
+
+<script>
+function updateStatus(bookingType, bookingId, newStatus) {
+    // Convert plural booking type to singular
+    const singularBookingType = bookingType.endsWith('s') ? bookingType.slice(0, -1) : bookingType;
+    
+    fetch(`/accounts/update-booking-status/${singularBookingType}/${bookingId}/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: `status=${newStatus}`
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.status === 'success') {
+            // Update the row immediately
+            const row = document.querySelector(`tr[data-booking-id="${bookingId}"]`);
+            if (row) {
+                const statusCell = row.querySelector('td:nth-child(5) span');
+                if (statusCell) {
+                    statusCell.textContent = newStatus.charAt(0).toUpperCase() + newStatus.slice(1);
+                    // Update status cell class
+                    statusCell.className = `px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        newStatus === 'cancelled' ? 'bg-red-100 text-red-800' : 
+                        newStatus === 'done' ? 'bg-gray-100 text-gray-800' :
+                        'bg-green-100 text-green-800'
+                    }`;
+                }
+                
+                // Update action buttons
+                const actionCell = row.querySelector('td:nth-child(6)');
+                if (actionCell) {
+                    if (newStatus === 'booked' || newStatus === 'in_queue') {
+                        actionCell.innerHTML = `
+                            <button onclick="updateStatus('${bookingType}', ${bookingId}, 'cancelled')" class="text-red-600 hover:text-red-900 mr-2">Cancel</button>
+                            <button onclick="updateStatus('${bookingType}', ${bookingId}, 'done')" class="text-green-600 hover:text-green-900">Mark as Done</button>
+                        `;
+                    } else {
+                        actionCell.innerHTML = `
+                            <button onclick="reactivateBooking('${bookingType}', ${bookingId})" class="text-blue-600 hover:text-blue-900">Reactivate</button>
+                        `;
+                    }
+                }
+            }
+            
+            // Re-run showBookings to update visibility
+            showBookings(currentView);
+            
+            // Optional: Show a success message
+            alert('Status updated successfully');
+        } else {
+            alert('Error updating status: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while updating the status. Check the console for more details.');
+    });
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function toggleSection(sectionId) {
+    const content = document.getElementById(`${sectionId}-content`);
+    const icon = document.getElementById(`${sectionId}-icon`);
+    content.classList.toggle('hidden');
+    icon.classList.toggle('rotate-180');
+}
+
+function showActiveBookings() {
+    showBookings('active');
+}
+
+function showDoneBookings() {
+    showBookings('done');
+}
+
+function showCancelledBookings() {
+    showBookings('cancelled');
+}
+
+let currentView = 'active';
+
+function showBookings(status) {
+    currentView = status;
+    localStorage.setItem('currentView', status);
+    console.log(`Showing bookings for status: ${status}`);
+    const bookingTypes = ['reservations', 'appointments', 'queues'];
+    bookingTypes.forEach(type => {
+        const content = document.getElementById(`${type}-content`);
+        if (content) {
+            console.log(`Processing ${type}`);
+            const rows = content.querySelectorAll('tbody tr');
+            let visibleCount = 0;
+            rows.forEach(row => {
+                const statusCell = row.querySelector('td:nth-child(5) span');
+                const currentStatus = statusCell.textContent.trim().toLowerCase();
+                console.log(`${type} - Current status: ${currentStatus}`);
+                let shouldShow = false;
+                if (status === 'active') {
+                    shouldShow = (currentStatus === 'booked' || currentStatus === 'in queue' || currentStatus === 'in_queue');
+                } else {
+                    shouldShow = (currentStatus === status);
+                }
+                row.style.display = shouldShow ? '' : 'none';
+                if (shouldShow) visibleCount++;
+                console.log(`${type} - Should show: ${shouldShow}`);
+            });
+            
+            // Show/hide the section based on visible rows
+            const section = content.closest('.mb-12');
+            section.style.display = visibleCount > 0 ? '' : 'none';
+            console.log(`${type} - Visible count: ${visibleCount}`);
+            
+            // Toggle content visibility
+            if (visibleCount > 0) {
+                content.classList.remove('hidden');
+                const icon = document.getElementById(`${type}-icon`);
+                icon.classList.add('rotate-180');
+            } else {
+                content.classList.add('hidden');
+                const icon = document.getElementById(`${type}-icon`);
+                icon.classList.remove('rotate-180');
+            }
+        } else {
+            console.log(`Content for ${type} not found`);
+        }
+    });
+}
+
+let currentSort = { column: -1, direction: '' };
+
+function parseDateTime(dateStr, timeStr) {
+    try {
+        const [monthName, day, year] = dateStr.split(' ');
+        let [hours, minutes] = timeStr.split(':');
+        let period = '';
+
+        // Check if the time is in 12-hour format
+        if (minutes.toLowerCase().includes('a.m.') || minutes.toLowerCase().includes('p.m.')) {
+            [minutes, period] = minutes.split(' ');
+            period = period.toLowerCase();
+        }
+
+        // Convert month name to month number
+        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const month = monthNames.indexOf(monthName) + 1;
+        if (month === 0) throw new Error(`Invalid month: ${monthName}`);
+
+        // Convert to 24-hour format if period is provided
+        hours = parseInt(hours);
+        if (period === 'p.m.' && hours !== 12) {
+            hours += 12;
+        } else if (period === 'a.m.' && hours === 12) {
+            hours = 0;
+        }
+        
+        const dateObj = new Date(year, month - 1, parseInt(day), hours, parseInt(minutes));
+        if (isNaN(dateObj.getTime())) throw new Error('Invalid date object');
+        return dateObj;
+    } catch (error) {
+        console.error('Error parsing date/time:', { dateStr, timeStr, error: error.message });
+        return null;
+    }
+}
+
+function sortTable(column, bookingType) {
+    console.log(`Sorting ${bookingType} by column ${column}`);
+    const table = document.querySelector(`#${bookingType}-content table`);
+    if (!table) {
+        console.error(`Table not found for ${bookingType}`);
+        return;
+    }
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+
+    // Toggle sort direction
+    const direction = column === currentSort.column && currentSort.direction === 'asc' ? 'desc' : 'asc';
+    currentSort = { column, direction };
+
+    // Sort the rows
+    rows.sort((a, b) => {
+        let aValue, bValue;
+
+        if (column === 0) { // Date & Time column
+            const aDateElement = a.cells[0].querySelector('div:first-child');
+            const aTimeElement = a.cells[0].querySelector('div:last-child');
+            const bDateElement = b.cells[0].querySelector('div:first-child');
+            const bTimeElement = b.cells[0].querySelector('div:last-child');
+        
+            if (!aDateElement || !aTimeElement || !bDateElement || !bTimeElement) {
+                console.error('Date or time element not found', { a: a.cells[0].innerHTML, b: b.cells[0].innerHTML });
+                return 0;
+            }
+        
+            const aDate = aDateElement.textContent.trim();
+            const aTime = aTimeElement.textContent.trim();
+            const bDate = bDateElement.textContent.trim();
+            const bTime = bTimeElement.textContent.trim();
+        
+            console.log('Comparing dates:', { aDate, aTime, bDate, bTime });
+        
+            aValue = parseDateTime(aDate, aTime);
+            bValue = parseDateTime(bDate, bTime);
+        
+            if (aValue === null && bValue === null) return 0;
+            if (aValue === null) return direction === 'asc' ? 1 : -1;
+            if (bValue === null) return direction === 'asc' ? -1 : 1;
+        
+            return direction === 'asc' ? aValue - bValue : bValue - aValue;
+        } else if (column === 3 && bookingType === 'queues') { // Position column for queues
+            aValue = parseInt(a.cells[column].textContent.trim());
+            bValue = parseInt(b.cells[column].textContent.trim());
+
+            if (isNaN(aValue) || isNaN(bValue)) {
+                console.error('Invalid position value', { aValue, bValue });
+                return 0;
+            }
+
+            return direction === 'asc' ? aValue - bValue : bValue - aValue;
+        } else {
+            aValue = a.cells[column].textContent.trim();
+            bValue = b.cells[column].textContent.trim();
+            return direction === 'asc'
+                ? aValue.localeCompare(bValue)
+                : bValue.localeCompare(aValue);
+        }
+    });
+
+    // Reorder the rows in the table
+    rows.forEach(row => tbody.appendChild(row));
+
+    // Update sort indicators
+    const headers = table.querySelectorAll('th');
+    headers.forEach((th, index) => {
+        const indicator = th.querySelector('.sort-indicator');
+        if (!indicator) {
+            console.warn(`Sort indicator not found for column ${index} in ${bookingType}`);
+            return;
+        }
+        if (index === column) {
+            indicator.textContent = direction === 'asc' ? ' ▲' : ' ▼';
+        } else {
+            indicator.textContent = '';
+        }
+    });
+
+    console.log(`Finished sorting ${bookingType}`);
+}
+
+function reactivateBooking(bookingType, bookingId) {
+    let newStatus;
+    if (bookingType === 'queues') {
+        newStatus = 'in_queue';
+    } else {
+        newStatus = 'booked';
+    }
+
+    updateStatus(bookingType, bookingId, newStatus);
+}
+
+function initializeView() {
+    const storedView = localStorage.getItem('currentView') || 'active';
+    showBookings(storedView);
+}
+
+// Call initializeView on page load
+document.addEventListener('DOMContentLoaded', initializeView);
+
+</script>
+{% endblock %}

@@ -1,10 +1,27 @@
-from django.db import models
+from django.db import models, transaction
 from django.contrib.auth.models import AbstractUser, UserManager
 from django.utils import timezone
 
+
 class CustomUser(AbstractUser):
+    STAFF_ROLES = [
+        ('OWNER', 'Owner'),
+        ('MANAGER', 'Manager'),
+        ('WORKER', 'Worker'),
+        ('CUSTOMER', 'Customer'),
+    ]
     phone_number = models.CharField(max_length=15, blank=True)
+    staff_role = models.CharField(max_length=10, choices=STAFF_ROLES, default='CUSTOMER')
+    business = models.ForeignKey('Business', on_delete=models.SET_NULL, null=True, blank=True, related_name='staff')
     objects = UserManager()
+
+    @property
+    def is_business_staff(self):
+        return self.staff_role != 'CUSTOMER' and self.business is not None
+    
+    def __str__(self):
+        return f"{self.username} - {self.get_staff_role_display()}"
+
 
 class Category(models.Model):
     name = models.CharField(max_length=100)
@@ -23,10 +40,62 @@ class Business(models.Model):
     image = models.ImageField(upload_to='business_images/', null=True, blank=True)
     people_in_queue = models.IntegerField(default=0)
     estimated_wait_time = models.IntegerField(default=0)  # in minutes
+    reservation_options = models.JSONField(null=True, blank=True)
+    appointment_reasons = models.JSONField(null=True, blank=True)
+
+    def update_people_in_queue(self):
+        active_queue_count = self.queue_set.filter(
+            status='in_queue'
+        ).count()
+        self.people_in_queue = active_queue_count
+        self.save(update_fields=['people_in_queue'])
+        return self.people_in_queue
+
+    def get_people_in_queue(self):
+        return self.update_people_in_queue()
+    
+    def get_role_permissions(self, role):
+        try:
+            return self.role_permissions.get(role=role)
+        except BusinessRolePermission.DoesNotExist:
+            return None
+
+    def user_has_permission(self, user, permission):
+        if user.is_superuser:
+            return True
+        role_permissions = self.get_role_permissions(user.staff_role)
+        return getattr(role_permissions, permission, False) if role_permissions else False
 
     def __str__(self):
         return self.name
 
+    def get_next_queue_position(self):
+        return self.queue_set.filter(status='in_queue').count() + 1
+
+    
+    def update_queue_positions(self):
+        with transaction.atomic():
+            queues = list(self.queue_set.filter(status='in_queue').order_by('created_at'))
+            
+            updated_queues = []
+            for index, queue in enumerate(queues, start=1):
+                if queue.position != index:
+                    queue.position = index
+                    updated_queues.append(queue)
+            
+            if updated_queues:
+                Queue.objects.bulk_update(updated_queues, ['position'])
+            
+            active_queue_count = len(queues)
+            if self.people_in_queue != active_queue_count:
+                self.people_in_queue = active_queue_count
+                self.save(update_fields=['people_in_queue'])
+
+    def update_people_in_queue(self):
+        active_queue_count = self.queue_set.filter(status='in_queue').count()
+        if self.people_in_queue != active_queue_count:
+            self.people_in_queue = active_queue_count
+            self.save(update_fields=['people_in_queue'])
 
 class Queue(models.Model):
     business = models.ForeignKey(Business, on_delete=models.CASCADE)
@@ -34,20 +103,62 @@ class Queue(models.Model):
     date = models.DateField(default=timezone.now)
     time = models.TimeField(default=timezone.now)
     created_at = models.DateTimeField(auto_now_add=True)
+    position = models.PositiveIntegerField(null=True, blank=True)
+    status = models.CharField(max_length=20, default='in_queue', choices=[
+        ('in_queue', 'In Queue'),
+        ('cancelled', 'Cancelled'),
+        ('done', 'Done')
+    ])
+
+    def save(self, *args, **kwargs):
+        if not self.pk and self.status == 'in_queue':
+            # Cancel any existing 'in_queue' entries for this user and business
+            Queue.objects.filter(
+                business=self.business,
+                user=self.user,
+                status='in_queue'
+            ).update(status='cancelled')
+
+            # Set the position for the new entry
+            self.position = self.business.get_next_queue_position()
+
+        super().save(*args, **kwargs)
+        self.business.update_queue_positions()
+
+    def delete(self, *args, **kwargs):
+        business = self.business
+        super().delete(*args, **kwargs)
+        business.update_queue_positions()
 
     class Meta:
-        unique_together = ['business', 'user']
+        indexes = [
+            models.Index(fields=['business', 'user', 'status', 'date', 'time']),
+        ]
+        ordering = ['position']
 
     def __str__(self):
-        return f"{self.user.username} - {self.business.name} - {self.date} {self.time}"
+        return f"{self.user.username} - {self.business.name} - Position: {self.position}"
+
+    @property
+    def people_ahead(self):
+        return Queue.objects.filter(
+            business=self.business,
+            status='in_queue',
+            position__lt=self.position
+        ).count()
 
 class Appointment(models.Model):
     business = models.ForeignKey(Business, on_delete=models.CASCADE)
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     date = models.DateField()
     time = models.TimeField()
-    reason = models.CharField(max_length=255)
+    reason = models.CharField(max_length=255, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=20, default='booked', choices=[
+        ('booked', 'Booked'),
+        ('cancelled', 'Cancelled'),
+        ('done', 'Done')
+    ])
 
     def __str__(self):
         return f"{self.user.username} - {self.business.name} - {self.date} {self.time}"
@@ -57,11 +168,31 @@ class Reservation(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     date = models.DateField()
     time = models.CharField(max_length=10)  # Store as "HH:MM"
-    option = models.CharField(max_length=50)  # For storing "Arena 1", "Arena 2", etc.
+    option = models.CharField(max_length=255, null=True, blank=True)  # For storing "Arena 1", "Arena 2", etc.
     created_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=20, default='booked', choices=[
+        ('booked', 'Booked'),
+        ('cancelled', 'Cancelled'),
+        ('done', 'Done')
+    ])
 
     class Meta:
-        unique_together = ['business', 'date', 'time', 'option']  # Add 'option' to the unique constraint
+        unique_together = ['business', 'date', 'time', 'option']  # Add 'option' to the unique constraint to ensure different options can be booked at the same time
 
     def __str__(self):
         return f"{self.business.name} - {self.date} {self.time} - {self.option}"
+    
+class BusinessRolePermission(models.Model):
+    business = models.ForeignKey(Business, on_delete=models.CASCADE, related_name='role_permissions')
+    role = models.CharField(max_length=10, choices=CustomUser.STAFF_ROLES)
+    can_edit_info = models.BooleanField(default=False)
+    can_edit_staff = models.BooleanField(default=False)
+    can_display_customers = models.BooleanField(default=False)
+    can_edit_availability = models.BooleanField(default=False)
+    can_edit_service = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = ('business', 'role')
+
+    def __str__(self):
+        return f"{self.business.name} - {self.get_role_display()} Permissions"

@@ -31,13 +31,17 @@
                         <label for="date" class="block text-sm font-medium text-gray-700">Date:</label>
                         <input type="date" id="date" name="date" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
                     </div>
+                    {%if reservation_options %}
                     <div>
                         <label for="option" class="block text-sm font-medium text-gray-700">Option:</label>
                         <select id="option" name="option" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
-                            <option value="Arena 1">Arena 1</option>
-                            <option value="Arena 2">Arena 2</option>
+                            <option value="">Select an option</option>
+                            {% for option in reservation_options %}
+                                <option value="{{ option }}">{{ option }}</option>
+                            {% endfor %}
                         </select>
                     </div>
+                    {% endif %}
                 </div>
 
                 <div>
@@ -56,7 +60,7 @@
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function() {
     const dateInput = document.getElementById('date');
     const optionSelect = document.getElementById('option');
     const timeSlotsDiv = document.getElementById('timeSlots');
@@ -70,23 +74,21 @@
     dateInput.min = todayString;
 
     function fetchAvailableSlots() {
-    const date = dateInput.value;
-    const option = optionSelect.value;
-    fetch(`/accounts/get_available_reservation_slots/{{ business.id }}/?date=${date}&option=${option}`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            displayTimeSlots(data.slots);
-        })
-        .catch(error => {
-            console.error('Error fetching available slots:', error);
-            alert(`Error fetching available slots: ${error.message}`);
-        });
-}
+        const date = dateInput.value;
+        const option = optionSelect ? optionSelect.value : '';
+        fetch(`/accounts/get_available_reservation_slots/{{ business.id }}/?date=${date}&option=${option}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    console.error('Error:', data.error);
+                    return;
+                }
+                displayTimeSlots(data.slots);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+    }
 
     function displayTimeSlots(slots) {
         timeSlotsDiv.innerHTML = '';
@@ -153,7 +155,9 @@
     });
 
     dateInput.addEventListener('change', fetchAvailableSlots);
-    optionSelect.addEventListener('change', fetchAvailableSlots);
+    if (optionSelect) {
+        optionSelect.addEventListener('change', fetchAvailableSlots);
+    }
     
     // Fetch available slots on page load
     fetchAvailableSlots();

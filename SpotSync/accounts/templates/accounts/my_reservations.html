@@ -42,9 +42,15 @@
                                 bg-gray-200 text-gray-800
                             {% elif booking.status == 'cancelled' %}
                                 bg-red-200 text-red-800
+                            {% else %}
+                                bg-blue-200 text-blue-800
                             {% endif %}
                         ">
-                            {{ booking.status|title|cut:"_"|default:" " }}
+                            {% if booking.booking_type == 'queue' and booking.status == 'in_queue' %}
+                                In Queue
+                            {% else %}
+                                {{ booking.status|title }}
+                            {% endif %}
                         </span>
                     </div>
                     {% if booking.can_cancel %}

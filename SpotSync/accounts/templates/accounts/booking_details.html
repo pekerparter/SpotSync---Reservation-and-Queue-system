@@ -46,22 +46,26 @@
                                 bg-blue-200 text-blue-800
                             {% endif %}
                         ">
-                            {{ booking.status|title|default:"Booked" }}
+                            {% if booking_type == 'queue' and booking.status == 'in_queue' %}
+                                In Queue
+                            {% else %}
+                                {{ booking.status|title }}
+                            {% endif %}
                         </span>
                     </p>
                 </div>
 
                 {% if booking.status|lower != 'cancelled' and booking.status|lower != 'done' %}
-                <div class="mt-6">
-                    <button class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
-                        onclick="cancelBooking('{{ booking_type }}', {{ booking.id }})">
-                        Cancel {{ booking_type|title }}
-                    </button>
-                </div>
+                    <div class="mt-6">
+                        <button class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
+                            onclick="cancelBooking('{{ booking_type }}', {{ booking.id }})">
+                            Cancel {{ booking_type|title }}
+                        </button>
+                    </div>
                 {% else %}
-                <div class="mt-6">
-                    <p class="text-sm text-gray-600">This booking cannot be cancelled.</p>
-                </div>
+                    <div class="mt-6">
+                        <p class="text-sm text-gray-600">This booking cannot be cancelled.</p>
+                    </div>
                 {% endif %}
             </div>
         </div>

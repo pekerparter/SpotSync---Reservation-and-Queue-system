@@ -1,5 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth import login, authenticate, get_user_model
+from django.contrib.auth import login, authenticate, get_user_model, logout
+from django.contrib.messages import get_messages
 from django.contrib.auth.forms import AuthenticationForm, SetPasswordForm
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -7,7 +8,7 @@ from django.views import View
 from django.urls import reverse_lazy
 import uuid
 from django.db import IntegrityError
-from .models import CustomUser, Category, Business, Reservation, Queue, Appointment
+from .models import *
 from .forms import CustomUserCreationForm, PasswordResetForm, UserProfileForm
 from django.utils import timezone
 from django.http import Http404
@@ -26,7 +27,20 @@ def register_view(request):
         form = CustomUserCreationForm()
     return render(request, 'accounts/register.html', {'form': form})
 
+def custom_logout(request):
+    messages.get_messages(request).used = True
+    storage = messages.get_messages(request)
+    storage.used = True
+    for _ in storage:
+        pass  # Iterate through messages to mark them as used
+    logout(request)
+    return redirect('landing_page')
+
 def custom_login_view(request):
+    storage = messages.get_messages(request)
+    storage.used = True
+    for _ in storage:
+        pass
     if request.method == 'POST':
         form = AuthenticationForm(data=request.POST)
         if form.is_valid():
@@ -58,13 +72,15 @@ def landing_page(request):
     # Check for the nearest reservation
     nearest_reservation = Reservation.objects.filter(
         user=request.user,
-        date__gte=now.date()
+        date__gte=now.date(),
+        status__in=['booked', 'in_queue']
     ).order_by('date', 'time').first()
     
     # Check for the nearest appointment
     nearest_appointment = Appointment.objects.filter(
         user=request.user,
-        date__gte=now.date()
+        date__gte=now.date(),
+        status__in=['booked', 'in_queue']
     ).order_by('date', 'time').first()
     
     # Determine which is sooner
@@ -85,20 +101,26 @@ def landing_page(request):
         'upcoming_booking': upcoming_booking
     })
 
+@login_required
 def booking_details(request, booking_type, booking_id):
     if booking_type == 'reservation':
-        booking = get_object_or_404(Reservation, id=booking_id)
+        booking = get_object_or_404(Reservation, id=booking_id, user=request.user)
     elif booking_type == 'appointment':
-        booking = get_object_or_404(Appointment, id=booking_id)
+        booking = get_object_or_404(Appointment, id=booking_id, user=request.user)
     elif booking_type == 'queue':
-        booking = get_object_or_404(Queue, id=booking_id)
-        booking.status = 'in_queue'  # Add a status for Queue objects
+        booking = get_object_or_404(Queue, id=booking_id, user=request.user)
     else:
         raise Http404("Invalid booking type")
+
+    # Adjust the status for queue entries
+    display_status = booking.status
+    if booking_type == 'queue' and booking.status == 'booked':
+        display_status = 'in_queue'
 
     context = {
         'booking': booking,
         'booking_type': booking_type,
+        'display_status': display_status,
     }
     return render(request, 'accounts/booking_details.html', context)
 
@@ -145,10 +167,22 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from .models import Business, Queue, Category
+from django.db import transaction
 @login_required
 def business_detail(request, business_id):
     business = get_object_or_404(Business, id=business_id)
     categories = business.categories.all()
+
+    # Calculate the number of people in queue
+    people_in_queue = Queue.objects.filter(
+        business=business,
+        status__in=['in_queue', 'booked']
+    ).count()
+
+    # Update the business's people_in_queue field
+    if business.people_in_queue != people_in_queue:
+        business.people_in_queue = people_in_queue
+        business.save()
 
     relevant_categories = []
     if any(category.name.lower() == 'waiting list' for category in categories):
@@ -166,6 +200,7 @@ def business_detail(request, business_id):
         context = {
             'business': business,
             'categories': relevant_categories,
+            'people_in_queue': people_in_queue,
         }
         return render(request, 'accounts/business_category_choice.html', context)
     else:
@@ -174,35 +209,76 @@ def business_detail(request, business_id):
         context = {
             'business': business,
             'user_in_queue': user_in_queue,
+            'people_in_queue': people_in_queue,
         }
         return render(request, 'accounts/business_detail.html', context)
 
+from django.db import IntegrityError
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+from .models import Business, Queue
+from django.utils import timezone
 
+@require_POST
 @login_required
 def add_to_queue(request, business_id):
-    business = get_object_or_404(Business, id=business_id)
+    try:
+        business = get_object_or_404(Business, id=business_id)
 
-    if not Queue.objects.filter(user=request.user, business=business).exists():
-        Queue.objects.create(user=request.user, business=business)
-        business.people_in_queue += 1
-        business.save()
-        return JsonResponse({'status': 'success', 'message': 'Added to queue'})
-    else:
-        return JsonResponse({'status': 'error', 'message': 'Already in queue'})
+        with transaction.atomic():
+            existing_queue = Queue.objects.filter(
+                user=request.user,
+                business=business,
+                status='in_queue'
+            ).first()
 
+            if existing_queue:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': 'You are already in the queue for this business.',
+                    'position': existing_queue.position,
+                    'people_ahead': existing_queue.people_ahead
+                })
+            else:
+                new_queue_entry = Queue.objects.create(
+                    user=request.user,
+                    business=business,
+                    status='in_queue',
+                    date=timezone.now().date(),
+                    time=timezone.now().time()
+                )
+                
+                business.update_queue_positions()
+
+                return JsonResponse({
+                    'status': 'success',
+                    'message': 'You have been added to the queue.',
+                    'position': new_queue_entry.position,
+                    'people_ahead': new_queue_entry.people_ahead
+                })
+
+    except IntegrityError:
+        return JsonResponse({'status': 'error', 'message': 'An error occurred while adding you to the queue.'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)})
 @login_required
 def remove_from_queue(request, business_id):
     business = get_object_or_404(Business, id=business_id)
-    queue_entry = Queue.objects.filter(user=request.user, business=business).first()
 
-    if queue_entry:
-        queue_entry.delete()
-        business.people_in_queue -= 1
-        business.save()
-        return JsonResponse({'status': 'success', 'message': 'Removed from queue'})
-    else:
-        return JsonResponse({'status': 'error', 'message': 'Not in queue'})
+    with transaction.atomic():
+        queue_entry = Queue.objects.filter(user=request.user, business=business, status='in_queue').first()
 
+        if queue_entry:
+            queue_entry.status = 'cancelled'
+            queue_entry.save()
+            
+            business.update_queue_positions()
+            
+            return JsonResponse({'status': 'success', 'message': 'Removed from queue'})
+        else:
+            return JsonResponse({'status': 'error', 'message': 'Not in queue'})
+        
+            
 from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
@@ -217,24 +293,18 @@ def my_reservations(request):
     appointments = Appointment.objects.filter(user=request.user)
     queues = Queue.objects.filter(user=request.user)
 
-    # Combine all bookings
     all_bookings = list(chain(reservations, appointments, queues))
-
-    # Sort the bookings
     all_bookings.sort(key=lambda x: (x.date, x.time if isinstance(x.time, str) else x.time.strftime('%H:%M')), reverse=True)
 
-    # Prepare bookings for template
     bookings = []
     for booking in all_bookings:
         booking_type = booking.__class__.__name__.lower()
-        if booking_type == 'queue':
-            status = 'in_queue'
-            can_cancel = True
-        elif booking_type in ['reservation', 'appointment']:
-            status = booking.status if hasattr(booking, 'status') else 'booked'
-            can_cancel = status == 'booked'
-        else:
-            continue
+        can_cancel = booking.status == 'booked' or (booking_type == 'queue' and booking.status == 'in_queue')
+
+        # Adjust the status for queue entries
+        display_status = booking.status
+        if booking_type == 'queue' and booking.status == 'booked':
+            display_status = 'in_queue'
 
         bookings.append({
             'id': booking.id,
@@ -242,7 +312,7 @@ def my_reservations(request):
             'time': booking.time if isinstance(booking.time, str) else booking.time.strftime('%H:%M'),
             'business': booking.business,
             'booking_type': booking_type,
-            'status': status,
+            'status': display_status,
             'can_cancel': can_cancel,
             'reason': getattr(booking, 'reason', ''),
             'option': getattr(booking, 'option', ''),
@@ -270,19 +340,14 @@ def cancel_booking(request, booking_type, booking_id):
 
     try:
         with transaction.atomic():
-            if booking_type == 'queue':
-                business = booking.business
-                business.people_in_queue = max(0, business.people_in_queue - 1)
-                business.save()
-                booking.delete()
-            elif booking_type in ['reservation', 'appointment']:
-                if hasattr(booking, 'status'):
-                    booking.status = 'cancelled'
-                    booking.save()
-                else:
-                    booking.delete()
-            else:
-                return JsonResponse({'success': False, 'message': 'Booking cannot be cancelled'})
+            business = booking.business
+
+            if booking.status != 'cancelled':
+                booking.status = 'cancelled'
+                booking.save()
+
+                if booking_type == 'queue':
+                    business.update_queue_positions()
 
         return JsonResponse({'success': True, 'message': 'Booking cancelled successfully'})
     except Exception as e:
@@ -314,18 +379,29 @@ from .models import Business
 @login_required
 def waiting_list(request, business_id):
     business = get_object_or_404(Business, id=business_id)
-    user_in_queue = Queue.objects.filter(user=request.user, business=business).exists()
+    queue_entry = Queue.objects.filter(user=request.user, business=business, status='in_queue').first()
 
     context = {
         'business': business,
-        'user_in_queue': user_in_queue,
+        'user_in_queue': bool(queue_entry),
     }
+
+    if queue_entry:
+        context.update({
+            'position': queue_entry.position,
+            'people_ahead': queue_entry.people_ahead
+        })
+
     return render(request, 'accounts/waiting_list.html', context)
 
 def reservation(request, business_id):
     business = get_object_or_404(Business, id=business_id)
     today = timezone.localtime(timezone.now()).date()
-    return render(request, 'accounts/reservation.html', {'business': business})
+    context = {
+        'business': business,
+        'reservation_options': business.reservation_options or []
+    }
+    return render(request, 'accounts/reservation.html', context)
 
 from django.views.decorators.http import require_GET, require_POST
 from datetime import datetime, timedelta
@@ -344,7 +420,7 @@ def make_reservation(request, business_id):
         business=business,
         date=date,
         time=time,
-        option=option
+        status__in=['booked', 'in_queue']  # Only consider active reservations
     ).exists()
 
     if is_available:
@@ -354,7 +430,8 @@ def make_reservation(request, business_id):
                 user=request.user,
                 date=date,
                 time=time,
-                option=option
+                option=option if option != '' else None,
+                status='booked'  # Explicitly set the status
             )
             return JsonResponse({'success': True, 'message': 'Reservation made successfully!'})
         except IntegrityError:
@@ -363,21 +440,36 @@ def make_reservation(request, business_id):
         return JsonResponse({'success': False, 'message': 'This slot is no longer available.'})
 def appointment(request, business_id):
     business = get_object_or_404(Business, id=business_id)
-    return render(request, 'accounts/appointment.html', {'business': business})
+    context = {
+        'business': business,
+        'appointment_reasons': business.appointment_reasons or []
+    }
+    return render(request, 'accounts/appointment.html', context)
 
+
+import logging
+logger = logging.getLogger(__name__)
 
 @require_GET
 def get_available_reservation_slots(request, business_id):
+    logger.info(f"Fetching slots for business_id: {business_id}")
     business = get_object_or_404(Business, id=business_id)
     date_str = request.GET.get('date')
     option = request.GET.get('option')
-    date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    logger.info(f"Date: {date_str}, Option: {option}")
+
+    try:
+        date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    except ValueError:
+        logger.error(f"Invalid date format: {date_str}")
+        return JsonResponse({'error': 'Invalid date format'}, status=400)
 
     # Generate time slots from opening time to closing time
     start_time = timezone.make_aware(datetime.combine(date, datetime.strptime(business.opening_time, '%H:%M').time()))
     end_time = timezone.make_aware(datetime.combine(date, datetime.strptime(business.closing_time, '%H:%M').time()))
-    time_slots = []
+    logger.info(f"Start time: {start_time}, End time: {end_time}")
 
+    time_slots = []
     current_time = start_time
     now = timezone.localtime(timezone.now())
     
@@ -389,14 +481,22 @@ def get_available_reservation_slots(request, business_id):
         if date == now.date() and current_time <= now:
             is_available = False
         else:
-            # Check if the slot is already booked for this specific option
-            is_booked = Reservation.objects.filter(
-                business=business,
-                date=date,
-                time=time_slot,
-                option=option
-            ).exists()
-            if is_booked:
+            # Check if the slot is already booked and not cancelled
+            if option:
+                active_reservations = Reservation.objects.filter(
+                    business=business,
+                    date=date,
+                    time=time_slot,
+                    option=option
+                ).exclude(status='cancelled').exists()
+            else:
+                active_reservations = Reservation.objects.filter(
+                    business=business,
+                    date=date,
+                    time=time_slot
+                ).exclude(status='cancelled').exists()
+            
+            if active_reservations:
                 is_available = False
 
         time_slots.append({
@@ -405,43 +505,7 @@ def get_available_reservation_slots(request, business_id):
         })
         current_time += timedelta(minutes=60)  # 1-hour slots
 
-    return JsonResponse({'slots': time_slots})
-
-@require_GET
-def get_available_appointment_slots(request, business_id):
-    business = get_object_or_404(Business, id=business_id)
-    date_str = request.GET.get('date')
-    date = datetime.strptime(date_str, '%Y-%m-%d').date()
-
-    # Generate time slots for appointments (example: 30-minute slots)
-    start_time = datetime.combine(date, datetime.strptime(business.opening_time, '%H:%M').time())
-    end_time = datetime.combine(date, datetime.strptime(business.closing_time, '%H:%M').time())
-    time_slots = []
-
-    current_time = start_time
-    now = timezone.localtime(timezone.now())
-    
-    while current_time < end_time:
-        time_slot = current_time.strftime('%H:%M')
-        is_available = True
-
-        # Check if the slot is in the past
-        if date == now.date() and current_time <= now:
-            is_available = False
-        else:
-            # Check if the slot is already booked
-            is_available = not Appointment.objects.filter(
-                business=business,
-                date=date,
-                time=time_slot
-            ).exists()
-
-        time_slots.append({
-            'time': time_slot,
-            'available': is_available
-        })
-        current_time += timedelta(minutes=30)
-
+    logger.info(f"Generated {len(time_slots)} time slots")
     return JsonResponse({'slots': time_slots})
 
 @require_GET
@@ -466,12 +530,15 @@ def get_available_appointment_slots(request, business_id):
         if date == now.date() and current_time <= now:
             is_available = False
         else:
-            # Check if the slot is already booked
-            is_available = not Appointment.objects.filter(
+            # Check if the slot is already booked and not cancelled
+            active_appointments = Appointment.objects.filter(
                 business=business,
                 date=date,
                 time=time_slot
-            ).exists()
+            ).exclude(status='cancelled').exists()
+            
+            if active_appointments:
+                is_available = False
 
         time_slots.append({
             'time': time_slot,
@@ -490,12 +557,12 @@ def book_appointment(request, business_id):
     time = request.POST.get('time')
     reason = request.POST.get('reason')
 
-    # Check if the appointment slot is already booked
+    # Check if the appointment slot is already booked and not cancelled
     existing_appointment = Appointment.objects.filter(
         business=business,
         date=date,
         time=time
-    ).exists()
+    ).exclude(status='cancelled').exists()
 
     if existing_appointment:
         return JsonResponse({"success": False, "message": "This slot is already booked."})
@@ -506,7 +573,245 @@ def book_appointment(request, business_id):
         user=request.user,
         date=date,
         time=time,
-        reason=reason
+        reason=reason if reason != '' else None,
+        status='booked'  # Explicitly set the status
     )
 
     return JsonResponse({"success": True, "message": "Appointment booked successfully!"})
+
+from django.contrib.auth.decorators import login_required, user_passes_test
+
+def is_business_staff(user):
+    return user.is_business_staff
+
+@login_required
+@user_passes_test(is_business_staff)
+def business_portal(request):
+    business = request.user.business
+    context = {
+        'business': business,
+        'can_edit_info': business.user_has_permission(request.user, 'can_edit_info'),
+        'can_edit_staff': business.user_has_permission(request.user, 'can_edit_staff'),
+        'can_display_customers': business.user_has_permission(request.user, 'can_display_customers'),
+        'can_edit_service': business.user_has_permission(request.user, 'can_edit_service'),
+    }
+    return render(request, 'accounts/business_portal.html', context)
+
+from django.http import HttpResponseForbidden
+
+@login_required
+@user_passes_test(is_business_staff)
+def edit_staff(request, business_id):
+    business = get_object_or_404(Business, id=business_id)
+    
+    # Ensure the user has permission to edit this business's staff
+    if not business.user_has_permission(request.user, 'can_edit_staff'):
+        return HttpResponseForbidden("You don't have permission to edit staff for this business.")
+
+    # Get all staff members for this business
+    CustomUser = get_user_model()
+    staff_members = CustomUser.objects.filter(business=business).exclude(staff_role='CUSTOMER')
+
+    context = {
+        'business': business,
+        'staff_members': staff_members,
+    }
+    return render(request, 'accounts/edit_staff.html', context)
+
+@login_required
+@user_passes_test(lambda u: u.is_business_staff)
+@require_POST
+def add_staff_member(request, business_id):
+    business = get_object_or_404(Business, id=business_id)
+    
+    # Ensure the user has permission to edit this business's staff
+    if not business.user_has_permission(request.user, 'can_edit_staff'):
+        return JsonResponse({"success": False, "message": "You don't have permission to add staff for this business."}, status=403)
+
+    email = request.POST.get('email')
+    role = request.POST.get('role')
+
+    CustomUser = get_user_model()
+    
+    try:
+        user = CustomUser.objects.get(email=email)
+        
+        # Check if the user is already a staff member of this business
+        if user.business == business and user.staff_role != 'CUSTOMER':
+            return JsonResponse({"success": False, "message": "This user is already a staff member of this business."})
+        
+        # Update the user's business and role
+        user.business = business
+        user.staff_role = role
+        user.save()
+        
+        return JsonResponse({
+            "success": True, 
+            "message": "Staff member added successfully.",
+            "staff_id": user.id,
+            "full_name": user.get_full_name(),
+            "email": user.email,
+            "role": user.get_staff_role_display()
+        })
+    except CustomUser.DoesNotExist:
+        return JsonResponse({"success": False, "message": "No user found with this email address."})
+    
+@require_GET
+def get_role_permissions(request, business_id):
+    business = get_object_or_404(Business, id=business_id)
+    permissions = {
+        'owner': {},
+        'manager': {},
+        'worker': {}
+    }
+    
+    for role in permissions.keys():
+        role_perm = BusinessRolePermission.objects.filter(business=business, role=role.upper()).first()
+        if role_perm:
+            permissions[role] = {
+                'edit_info': role_perm.can_edit_info,
+                'edit_service': role_perm.can_edit_service,
+                'edit_staff': role_perm.can_edit_staff,
+                'availability': role_perm.can_edit_availability,
+                'display': role_perm.can_display_customers
+            }
+        else:
+            # Set default permissions if not found in the database
+            permissions[role] = {
+                'edit_info': role == 'owner',
+                'edit_service': role == 'owner',
+                'edit_staff': role == 'owner',
+                'availability': True,
+                'display': True
+            }
+    
+    return JsonResponse(permissions)
+
+@require_POST
+def update_role_permissions(request, business_id):
+    business = get_object_or_404(Business, id=business_id)
+    
+    for role in ['owner', 'manager', 'worker']:
+        role_perm, created = BusinessRolePermission.objects.get_or_create(
+            business=business,
+            role=role.upper()
+        )
+        
+        role_perm.can_edit_info = request.POST.get(f'{role}-edit-info') == 'on'
+        role_perm.can_edit_service = request.POST.get(f'{role}-edit-service') == 'on'
+        role_perm.can_edit_staff = request.POST.get(f'{role}-edit-staff') == 'on'
+        role_perm.can_edit_availability = request.POST.get(f'{role}-availability') == 'on'
+        role_perm.can_display_customers = request.POST.get(f'{role}-display') == 'on'
+        
+        role_perm.save()
+    
+    return JsonResponse({'success': True})
+
+@require_POST
+@login_required
+def delete_staff_member(request, business_id, staff_id):
+    business = get_object_or_404(Business, id=business_id)
+    staff_member = get_object_or_404(CustomUser, id=staff_id, business=business)
+
+    # Check if the user has permission to edit staff
+    if not business.user_has_permission(request.user, 'can_edit_staff'):
+        return JsonResponse({'success': False, 'message': 'You do not have permission to delete staff members.'})
+
+    # Check role-based restrictions
+    if staff_member.staff_role == 'OWNER':
+        return JsonResponse({'success': False, 'message': 'The owner cannot be deleted.'})
+    elif staff_member.staff_role == 'MANAGER' and request.user.staff_role != 'OWNER':
+        return JsonResponse({'success': False, 'message': 'Only the owner can delete a manager.'})
+    elif staff_member.staff_role == 'WORKER' and request.user.staff_role not in ['OWNER', 'MANAGER']:
+        return JsonResponse({'success': False, 'message': 'Only the owner or a manager can delete a worker.'})
+
+    # Proceed with staff deletion
+    try:
+        with transaction.atomic():
+            staff_member.business = None
+            staff_member.staff_role = 'CUSTOMER'
+            staff_member.save()
+        return JsonResponse({'success': True, 'message': 'Staff member removed successfully'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': str(e)})
+    
+@login_required
+@user_passes_test(is_business_staff)
+def edit_business_info(request, business_id):
+    business = get_object_or_404(Business, id=business_id)
+    
+    if not business.user_has_permission(request.user, 'can_edit_info'):
+        messages.error(request, "You don't have permission to edit this business's information.")
+        return redirect('business_portal')
+
+    if request.method == 'POST':
+        business.name = request.POST.get('name')
+        business.address = request.POST.get('address')
+        business.phone_number = request.POST.get('phone_number')
+
+        if 'image' in request.FILES:
+            business.image = request.FILES['image']
+
+        business.save()
+        messages.success(request, 'Business information updated successfully.')
+        return redirect('business_portal')
+
+    return render(request, 'accounts/edit_business_info.html', {'business': business})
+
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render, get_object_or_404, redirect
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+
+@login_required
+@user_passes_test(is_business_staff)
+def business_customer_list(request, business_id):
+    business = get_object_or_404(Business, id=business_id)
+    
+    # Check if the user has permission to view this data
+    if not business.user_has_permission(request.user, 'can_display_customers'):
+        return redirect('landing_page')  # or wherever you want to redirect unauthorized users
+
+    reservations = Reservation.objects.filter(business=business).order_by('date', 'time')
+    appointments = Appointment.objects.filter(business=business).order_by('date', 'time')
+    queues = Queue.objects.filter(business=business).order_by('date', 'time')
+
+    context = {
+        'business': business,
+        'booking_data': {
+            'reservations': reservations,
+            'appointments': appointments,
+            'queues': queues,
+        },
+    }
+
+    return render(request, 'accounts/business_customer_list.html', context)
+
+@require_POST
+@login_required
+@user_passes_test(is_business_staff)
+def update_booking_status(request, booking_type, booking_id):
+    if booking_type == 'reservation':
+        booking = get_object_or_404(Reservation, id=booking_id, business__staff=request.user)
+    elif booking_type == 'appointment':
+        booking = get_object_or_404(Appointment, id=booking_id, business__staff=request.user)
+    elif booking_type == 'queue':
+        booking = get_object_or_404(Queue, id=booking_id, business__staff=request.user)
+    else:
+        return JsonResponse({'success': False, 'message': 'Invalid booking type'})
+
+    new_status = request.POST.get('status')
+    if new_status not in ['booked', 'cancelled', 'done', 'in_queue']:
+        return JsonResponse({'success': False, 'message': 'Invalid status'})
+
+    try:
+        with transaction.atomic():
+            booking.status = new_status
+            booking.save()
+
+            if booking_type == 'queue':
+                booking.business.update_queue_positions()
+
+        return JsonResponse({'success': True, 'message': 'Booking status updated successfully'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': str(e)})

@@ -5,6 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}SpotSync{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .sort-indicator {
+            display: inline-block;
+            width: 0;
+            height: 0;
+            margin-left: 5px;
+            vertical-align: middle;
+        }
+    
+        th:hover .sort-indicator:empty::before {
+            content: '▲▼';
+            opacity: 0.3;
+        }
+    </style>
 </head>
 <body class="bg-gray-100">
     <nav class="bg-blue-500 text-white p-4">
@@ -17,17 +31,15 @@
                 SpotSync
             </a>
             <div class="flex gap-6">
+                {% if user.staff_role != 'CUSTOMER' and user.business %}
+                    <a href="{% url 'business_portal' %}" class="hover:underline">Business Portal</a>
+                {% endif %}
                 <a href="{% url 'categories' %}" class="hover:underline">Categories</a>
                 <a href="{% url 'my_reservations' %}" class="hover:underline">My Reservations</a>
-                <a href="{% url 'profile' %}" class="hover:underline flex items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M5.121 17.804A9 9 0 1117.804 5.121m-7.683 2.682a3 3 0 104.242 4.242" />
-                    </svg>
-                    Profile
-                </a>
-                <form method="post" action="{% url 'logout' %}" class="inline">
+                <a href="{% url 'profile' %}" class="hover:underline">Profile</a>
+                <form method="post" action="{% url 'custom_logout' %}" class="inline">
                     {% csrf_token %}
-                    <button type="submit" class="bg-red-500 px-4 py-2 rounded hover:bg-red-600 transition-colors duration-200">
+                    <button type="submit" class="bg-red-500 px-3 py-2 rounded hover:bg-red-600 transition-colors duration-200">
                         Sign Out
                     </button>
                 </form>

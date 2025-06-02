@@ -1,0 +1,300 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mx-auto mt-8 p-4">
+    <h1 class="text-2xl font-bold mb-4">Edit Staff for {{ business.name }}</h1>
+
+    <div class="mb-8">
+        <h2 class="text-xl font-semibold mb-2">Add New Staff Member</h2>
+        <form id="add-staff-form" class="flex items-center">
+            {% csrf_token %}
+            <input type="email" id="staff-email" placeholder="Email" class="flex-grow p-2 border rounded-l" required>
+            <select id="staff-role" class="p-2 border-t border-b">
+                <option value="WORKER">Worker</option>
+                <option value="MANAGER">Manager</option>
+                <option value="OWNER">Owner</option>
+            </select>
+            <button type="button" id="role-abilities-btn" class="bg-blue-500 text-white p-2 border-t border-b">Role Abilities</button>
+            <button type="submit" class="bg-green-500 text-white p-2 rounded-r">Add</button>
+        </form>
+    </div>
+
+    <div>
+        <h2 class="text-xl font-semibold mb-2">Current Staff</h2>
+        <div id="staff-list">
+            {% for staff in staff_members %}
+            <div class="bg-blue-100 p-4 rounded mb-2 flex justify-between items-center">
+                <div>
+                    <span class="font-semibold">{{ staff.get_full_name }}</span>
+                    <span class="text-gray-600 ml-2">{{ staff.email }}</span>
+                    <span class="bg-blue-500 text-white px-2 py-1 rounded ml-2">{{ staff.get_staff_role_display }}</span>
+                </div>
+                <button class="delete-staff bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded" data-staff-id="{{ staff.id }}">
+                    Delete
+                </button>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Role Abilities Popup -->
+<div id="role-abilities-popup" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center">
+    <div class="bg-white p-6 rounded-lg">
+        <h2 class="text-xl font-bold mb-4">Role Abilities</h2>
+        <form id="role-abilities-form">
+            {% csrf_token %}
+            <table class="w-full">
+                <thead>
+                    <tr>
+                        <th class="px-4 py-2"></th>
+                        <th class="px-4 py-2">Owner</th>
+                        <th class="px-4 py-2">Manager</th>
+                        <th class="px-4 py-2">Worker</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="px-4 py-2">Edit Info</td>
+                        <td class="px-4 py-2"><input type="checkbox" id="owner-edit-info" name="owner-edit-info"></td>
+                        <td class="px-4 py-2"><input type="checkbox" id="manager-edit-info" name="manager-edit-info"></td>
+                        <td class="px-4 py-2"><input type="checkbox" id="worker-edit-info" name="worker-edit-info"></td>
+                    </tr>
+                    <tr>
+                        <td class="px-4 py-2">Edit Service</td>
+                        <td class="px-4 py-2"><input type="checkbox" id="owner-edit-service" name="owner-edit-service"></td>
+                        <td class="px-4 py-2"><input type="checkbox" id="manager-edit-service" name="manager-edit-service"></td>
+                        <td class="px-4 py-2"><input type="checkbox" id="worker-edit-service" name="worker-edit-service"></td>
+                    </tr>
+                    <tr>
+                        <td class="px-4 py-2">Edit Staff</td>
+                        <td class="px-4 py-2"><input type="checkbox" id="owner-edit-staff" name="owner-edit-staff"></td>
+                        <td class="px-4 py-2"><input type="checkbox" id="manager-edit-staff" name="manager-edit-staff"></td>
+                        <td class="px-4 py-2"><input type="checkbox" id="worker-edit-staff" name="worker-edit-staff"></td>
+                    </tr>
+                    <tr>
+                        <td class="px-4 py-2">Availability</td>
+                        <td class="px-4 py-2"><input type="checkbox" id="owner-availability" name="owner-availability"></td>
+                        <td class="px-4 py-2"><input type="checkbox" id="manager-availability" name="manager-availability"></td>
+                        <td class="px-4 py-2"><input type="checkbox" id="worker-availability" name="worker-availability"></td>
+                    </tr>
+                    <tr>
+                        <td class="px-4 py-2">Customer List</td>
+                        <td class="px-4 py-2"><input type="checkbox" id="owner-display" name="owner-display"></td>
+                        <td class="px-4 py-2"><input type="checkbox" id="manager-display" name="manager-display"></td>
+                        <td class="px-4 py-2"><input type="checkbox" id="worker-display" name="worker-display"></td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="mt-4 flex justify-end">
+                <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded mr-2">Save Changes</button>
+                <button type="button" id="close-popup" class="bg-blue-500 text-white px-4 py-2 rounded">Close</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Delete Confirmation Popup -->
+<div id="delete-confirmation-popup" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center">
+    <div class="bg-white p-6 rounded-lg">
+        <h2 class="text-xl font-bold mb-4">Confirm Deletion</h2>
+        <p>Are you sure you want to remove this staff member?</p>
+        <div class="mt-4 flex justify-end">
+            <button id="confirm-delete" class="bg-red-500 text-white px-4 py-2 rounded mr-2">Delete</button>
+            <button id="cancel-delete" class="bg-gray-500 text-white px-4 py-2 rounded">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const businessId = {{ business.id }};
+    const addStaffForm = document.getElementById('add-staff-form');
+    const staffList = document.getElementById('staff-list');
+    const deleteConfirmationPopup = document.getElementById('delete-confirmation-popup');
+    const confirmDeleteBtn = document.getElementById('confirm-delete');
+    const cancelDeleteBtn = document.getElementById('cancel-delete');
+    const roleAbilitiesBtn = document.getElementById('role-abilities-btn');
+    const roleAbilitiesPopup = document.getElementById('role-abilities-popup');
+    const closePopupBtn = document.getElementById('close-popup');
+
+    let currentStaffId;
+
+    function showDeleteConfirmation(staffId) {
+        currentStaffId = staffId;
+        deleteConfirmationPopup.classList.remove('hidden');
+        deleteConfirmationPopup.classList.add('flex');
+    }
+
+    function hideDeleteConfirmation() {
+        deleteConfirmationPopup.classList.add('hidden');
+        deleteConfirmationPopup.classList.remove('flex');
+    }
+
+    // Add event listeners to existing delete buttons
+    document.querySelectorAll('.delete-staff').forEach(button => {
+        button.addEventListener('click', function() {
+            const staffId = this.getAttribute('data-staff-id');
+            showDeleteConfirmation(staffId);
+        });
+    });
+
+    confirmDeleteBtn.addEventListener('click', function() {
+        if (currentStaffId) {
+            fetch(`/accounts/delete-staff-member/{{ business.id }}/${currentStaffId}/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'Content-Type': 'application/json',
+                },
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const staffElement = document.querySelector(`.delete-staff[data-staff-id="${currentStaffId}"]`).closest('.bg-blue-100');
+                    staffElement.remove();
+                    hideDeleteConfirmation();
+                    alert(data.message);
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while deleting the staff member. Please try again.');
+            });
+        }
+    });
+
+    cancelDeleteBtn.addEventListener('click', hideDeleteConfirmation);
+
+    // Role Abilities Popup
+    roleAbilitiesBtn.addEventListener('click', function() {
+        console.log('Fetching role permissions...');
+        fetch(`/accounts/get-role-permissions/{{ business.id }}/`)
+            .then(response => {
+                console.log('Response received:', response);
+                return response.json();
+            })
+            .then(data => {
+                console.log('Data received:', data);
+                for (const [role, permissions] of Object.entries(data)) {
+                    for (const [permission, value] of Object.entries(permissions)) {
+                        const checkbox = document.getElementById(`${role}-${permission.replace('_', '-')}`);
+                        if (checkbox) {
+                            checkbox.checked = value;
+                            console.log(`Set ${role}-${permission} to ${value}`);
+                        } else {
+                            console.log(`Checkbox not found: ${role}-${permission}`);
+                        }
+                    }
+                }
+                roleAbilitiesPopup.classList.remove('hidden');
+                roleAbilitiesPopup.classList.add('flex');
+            })
+            .catch(error => {
+                console.error('Error fetching permissions:', error);
+                alert('An error occurred while fetching role permissions.');
+            });
+    });
+
+    const roleAbilitiesForm = document.getElementById('role-abilities-form');
+    roleAbilitiesForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData(roleAbilitiesForm);
+
+        fetch(`/accounts/update-role-permissions/{{ business.id }}/`, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Role permissions updated successfully.');
+                roleAbilitiesPopup.classList.add('hidden');
+                roleAbilitiesPopup.classList.remove('flex');
+            } else {
+                alert('Error updating role permissions: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while updating role permissions.');
+        });
+    });
+
+    closePopupBtn.addEventListener('click', function() {
+        roleAbilitiesPopup.classList.add('hidden');
+        roleAbilitiesPopup.classList.remove('flex');
+    });
+
+    // Close popup when clicking outside
+    roleAbilitiesPopup.addEventListener('click', function(e) {
+        if (e.target === roleAbilitiesPopup) {
+            roleAbilitiesPopup.classList.add('hidden');
+            roleAbilitiesPopup.classList.remove('flex');
+        }
+    });
+
+    // Close delete confirmation popup when clicking outside
+    deleteConfirmationPopup.addEventListener('click', function(e) {
+        if (e.target === deleteConfirmationPopup) {
+            hideDeleteConfirmation();
+        }
+    });
+
+    // Add new staff member
+    addStaffForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const email = document.getElementById('staff-email').value;
+        const role = document.getElementById('staff-role').value;
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+        fetch(`/accounts/business/${businessId}/add-staff/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': csrfToken
+            },
+            body: `email=${encodeURIComponent(email)}&role=${encodeURIComponent(role)}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Add the new staff member to the list
+                const staffList = document.getElementById('staff-list');
+                const newStaffHtml = `
+                    <div class="bg-blue-100 p-4 rounded mb-2 flex justify-between items-center">
+                        <div>
+                            <span class="font-semibold">${data.full_name}</span>
+                            <span class="text-gray-600 ml-2">${data.email}</span>
+                            <span class="bg-blue-500 text-white px-2 py-1 rounded ml-2">${data.role}</span>
+                        </div>
+                        <button class="delete-staff bg-red-500 text-white px-4 py-2 rounded" data-staff-id="${data.staff_id}">Delete</button>
+                    </div>
+                `;
+                staffList.insertAdjacentHTML('afterbegin', newStaffHtml);
+                
+                // Clear the form
+                document.getElementById('staff-email').value = '';
+                
+                // Show success message
+                alert(data.message);
+            } else {
+                // Show error message
+                alert(data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while adding the staff member.');
+        });
+    });
+});
+</script>
+{% endblock %}

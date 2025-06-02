@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Edit Business Info{% endblock %}
+
+{% block content %}
+<div class="bg-blue-100 min-h-screen">
+    <main class="container mx-auto mt-8 p-4">
+        <h1 class="text-2xl font-bold mb-4">Edit Business Info</h1>
+
+        <div class="bg-white rounded-lg shadow-md overflow-hidden">
+            <form method="post" enctype="multipart/form-data" class="p-8">
+                {% csrf_token %}
+                <div class="md:flex">
+                    <div class="md:flex-shrink-0 mb-4 md:mb-0 md:mr-8">
+                        <img id="preview-image" class="h-48 w-full object-cover md:w-48 mb-2" src="{{ business.image.url }}" alt="{{ business.name }}">
+                        <input type="file" name="image" id="image-upload" class="hidden" accept="image/*">
+                        <label for="image-upload" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded cursor-pointer block text-center">
+                            Change Image
+                        </label>
+                    </div>
+                    <div class="flex-grow">
+                        <div class="mb-4">
+                            <label for="business-name" class="block text-gray-700 font-bold mb-2">Business Name</label>
+                            <input type="text" id="business-name" name="name" value="{{ business.name }}" class="w-full px-3 py-2 border rounded-lg" required>
+                        </div>
+                        <div class="mb-4">
+                            <label for="address" class="block text-gray-700 font-bold mb-2">Address</label>
+                            <input type="text" id="address" name="address" value="{{ business.address }}" class="w-full px-3 py-2 border rounded-lg" required>
+                        </div>
+                        <div class="mb-4">
+                            <label for="phone-number" class="block text-gray-700 font-bold mb-2">Phone Number</label>
+                            <input type="tel" id="phone-number" name="phone_number" value="{{ business.phone_number }}" class="w-full px-3 py-2 border rounded-lg" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-6 flex justify-end space-x-4">
+                    <button type="submit" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
+                        Save Changes
+                    </button>
+                    <a href="{% url 'business_portal' %}" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
+                        Discard Changes
+                    </a>
+                </div>
+            </form>
+        </div>
+    </main>
+</div>
+
+<script>
+    document.getElementById('image-upload').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('preview-image').src = e.target.result;
+            }
+            reader.readAsDataURL(file);
+        }
+    });
+</script>
+{% endblock %}

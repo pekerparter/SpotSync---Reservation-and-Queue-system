@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Business Portal{% endblock %}
+
+{% block content %}
+<div class="bg-blue-100 min-h-screen">
+
+    <main class="container mx-auto mt-8 p-4">
+        <h1 class="text-2xl font-bold mb-4">Hello, {{ user.get_full_name|default:user.username }} ({{ user.get_staff_role_display }})</h1>
+
+        <div class="bg-white rounded-lg shadow-md overflow-hidden">
+            <div class="md:flex">
+                <div class="md:flex-shrink-0">
+                    <img class="h-48 w-full object-cover md:w-48" src="{{ business.image.url }}" alt="{{ business.name }}">
+                </div>
+                <div class="p-8">
+                    <div class="uppercase tracking-wide text-sm text-indigo-500 font-semibold">{{ business.name }}</div>
+                    <p class="mt-2 text-gray-500">{{ business.address }}</p>
+                    <p class="mt-2 text-gray-500">{{ business.phone_number }}</p>
+
+                    <div class="mt-4 grid grid-cols-2 gap-4">
+                        {% if can_edit_info %}
+                            <a href="{% url 'edit_business_info' business.id %}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-center">
+                                Edit Info
+                            </a>
+                        {% endif %}
+                        {% if can_edit_staff %}
+                            <a href="{% url 'edit_staff' business.id %}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-center">
+                                Edit Staff
+                            </a>
+                        {% endif %}
+                        {% if can_display_customers %}
+                            <a href="{% url 'business_customer_list' business.id%}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-center">
+                                Display Customers
+                            </a>
+                        {% endif %}
+                        {% if can_edit_service %}
+                            <a href="#" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded text-center">
+                                Edit Service
+                            </a>
+                        {% endif %}
+                    </div>
+
+                    <div class="mt-4 flex items-center">
+                        <span class="bg-green-500 rounded-full w-3 h-3 mr-2"></span>
+                        <span class="text-sm text-gray-600">Available</span>
+                    </div>
+                    <p class="text-sm text-gray-500">The store is accepting services.</p>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+{% endblock %}

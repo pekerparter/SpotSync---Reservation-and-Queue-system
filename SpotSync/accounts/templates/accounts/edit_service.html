@@ -28,48 +28,126 @@
                 </div>
             </div>
 
+            <!-- Reservation Options -->
             <div id="reservation_options" class="bg-gray-50 p-4 rounded-md {% if 'Reservations' not in current_categories %}hidden{% endif %}">
-                <p>Reservation options here</p>
+                <h3 class="text-lg font-medium text-gray-900 mb-2">Reservation Options</h3>
+                <div class="flex space-x-2 mb-4">
+                    <input type="text" id="reservation_option_input" placeholder="Enter reservation option" 
+                        class="flex-grow border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    <button type="button" id="add_reservation_option" 
+                            class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded transition duration-300 ease-in-out">
+                        Add
+                    </button>
+                </div>
+                <div id="reservation_options_list" class="flex flex-wrap gap-2">
+                    {% for option in reservation_options %}
+                        <span class="bg-blue-100 text-blue-800 text-sm font-medium mr-2 px-2.5 py-0.5 rounded flex items-center">
+                            {{ option }}
+                            <button type="button" class="ml-2 text-blue-600 hover:text-blue-800 focus:outline-none delete-option" data-option="{{ option }}">
+                                ×
+                            </button>
+                        </span>
+                    {% endfor %}
+                </div>
+                <input type="hidden" name="reservation_options" id="reservation_options_input">
             </div>
-            
+
+            <!-- Appointment Reasons -->
             <div id="appointment_reasons" class="bg-gray-50 p-4 rounded-md {% if 'Appointments' not in current_categories %}hidden{% endif %}">
-                <p>Appointment reasons here</p>
+                <h3 class="text-lg font-medium text-gray-900 mb-2">Appointment Reasons</h3>
+                <div class="flex space-x-2 mb-4">
+                    <input type="text" id="appointment_reason_input" placeholder="Enter appointment reason" 
+                        class="flex-grow border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    <button type="button" id="add_appointment_reason" 
+                            class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded transition duration-300 ease-in-out">
+                        Add
+                    </button>
+                </div>
+                <div id="appointment_reasons_list" class="flex flex-wrap gap-2">
+                    {% for reason in appointment_reasons %}
+                        <span class="bg-blue-100 text-blue-800 text-sm font-medium mr-2 px-2.5 py-0.5 rounded flex items-center">
+                            {{ reason }}
+                            <button type="button" class="ml-2 text-blue-600 hover:text-blue-800 focus:outline-none delete-reason" data-reason="{{ reason }}">
+                                ×
+                            </button>
+                        </span>
+                    {% endfor %}
+                </div>
+                <input type="hidden" name="appointment_reasons" id="appointment_reasons_input">
             </div>
-            
+            <!-- Waiting List Options -->
             <div id="waiting_list_options" class="bg-gray-50 p-4 rounded-md {% if 'Waiting list' not in current_categories %}hidden{% endif %}">
-                <p>Waiting List options here</p>
+                <h3 class="text-lg font-medium text-gray-900 mb-2">Waiting List Options</h3>
+                <div class="mb-4">
+                    <div class="flex items-center">
+                        <input type="checkbox" id="enable_time_estimation" name="enable_time_estimation" 
+                               class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                               {% if business.enable_time_estimation %}checked{% endif %}>
+                        <label for="enable_time_estimation" class="ml-2 block text-sm text-gray-900">
+                            Time estimation
+                        </label>
+                    </div>
+                    <p class="text-sm text-gray-500 mt-1">Adds info for customers of the estimated time till their turn</p>
+                </div>
+                <div id="time_per_customer_container" class="{% if not business.enable_time_estimation %}hidden{% endif %}">
+                    <label for="time_per_customer" class="block text-sm font-medium text-gray-700">Time per customer (minutes)</label>
+                    <input type="number" id="time_per_customer" name="time_per_customer" 
+                           value="{{ business.time_per_customer }}" min="1" max="120"
+                           class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                           placeholder="Amount of time (in minutes)">
+                </div>
             </div>
             
+            <!-- Time Intervals -->
+            <div class="bg-gray-50 p-4 rounded-md mb-4">
+                <h3 class="text-lg font-medium text-gray-900 mb-2">Time intervals for reservations and appointments</h3>
+                <div class="grid grid-cols-2 gap-4">
+                    <div id="reservation_interval_container" class="{% if 'Reservations' not in current_categories %}hidden{% endif %}">
+                        <label for="reservation_interval" class="block text-sm font-medium text-gray-700 mb-1">Reservation Interval (minutes)</label>
+                        <input type="number" id="reservation_interval" name="reservation_interval" 
+                            value="{{ business.reservation_interval }}" min="15" max="120" step="15"
+                            class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    </div>
+                    <div id="appointment_interval_container" class="{% if 'Appointments' not in current_categories %}hidden{% endif %}">
+                        <label for="appointment_interval" class="block text-sm font-medium text-gray-700 mb-1">Appointment Interval (minutes)</label>
+                        <input type="number" id="appointment_interval" name="appointment_interval" 
+                            value="{{ business.appointment_interval }}" min="15" max="120" step="15"
+                            class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Business Hours -->
             <h3 class="text-lg font-medium text-gray-900 mb-2">Business Hours</h3>
-    {% for day_hours in business_hours %}
-    <div class="mb-4 p-4 border rounded">
-        <h4 class="font-medium mb-2">{{ day_hours.get_day_display }}</h4>
-        <div class="flex items-center mb-2">
-            <input type="checkbox" id="working_day_{{ day_hours.day }}" name="working_day_{{ day_hours.day }}" 
-                   {% if day_hours.is_working_day %}checked{% endif %}
-                   class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
-            <label for="working_day_{{ day_hours.day }}" class="ml-2 block text-sm text-gray-900">
-                Working day
-            </label>
-        </div>
-        <div class="grid grid-cols-2 gap-4">
-            <div>
-                <label for="opening_time_{{ day_hours.day }}" class="block text-xs text-gray-500 mb-1">Opening Time</label>
-                <input type="time" id="opening_time_{{ day_hours.day }}" name="opening_time_{{ day_hours.day }}" 
-                       value="{{ day_hours.opening_time|time:'H:i' }}"
-                       {% if not day_hours.is_working_day %}disabled{% endif %}
-                       class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+            {% for day_hours in business_hours %}
+            <div class="mb-4 p-4 border rounded">
+                <h4 class="font-medium mb-2">{{ day_hours.get_day_display }}</h4>
+                <div class="flex items-center mb-2">
+                    <input type="checkbox" id="working_day_{{ day_hours.day }}" name="working_day_{{ day_hours.day }}" 
+                        {% if day_hours.is_working_day %}checked{% endif %}
+                        class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                    <label for="working_day_{{ day_hours.day }}" class="ml-2 block text-sm text-gray-900">
+                        Working day
+                    </label>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label for="opening_time_{{ day_hours.day }}" class="block text-xs text-gray-500 mb-1">Opening Time</label>
+                        <input type="time" id="opening_time_{{ day_hours.day }}" name="opening_time_{{ day_hours.day }}" 
+                            value="{{ day_hours.opening_time|time:'H:i' }}"
+                            {% if not day_hours.is_working_day %}disabled{% endif %}
+                            class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="closing_time_{{ day_hours.day }}" class="block text-xs text-gray-500 mb-1">Closing Time</label>
+                        <input type="time" id="closing_time_{{ day_hours.day }}" name="closing_time_{{ day_hours.day }}" 
+                            value="{{ day_hours.closing_time|time:'H:i' }}"
+                            {% if not day_hours.is_working_day %}disabled{% endif %}
+                            class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    </div>
+                </div>
             </div>
-            <div>
-                <label for="closing_time_{{ day_hours.day }}" class="block text-xs text-gray-500 mb-1">Closing Time</label>
-                <input type="time" id="closing_time_{{ day_hours.day }}" name="closing_time_{{ day_hours.day }}" 
-                       value="{{ day_hours.closing_time|time:'H:i' }}"
-                       {% if not day_hours.is_working_day %}disabled{% endif %}
-                       class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-            </div>
-        </div>
-    </div>
-    {% endfor %}
+            {% endfor %}
 
             <div class="flex justify-end space-x-4 pt-4">
                 <button type="button" onclick="window.history.back()" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded transition duration-300 ease-in-out">
@@ -84,72 +162,178 @@
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function() {
+    function updateVisibility() {
+        var reservationService = document.getElementById('reservation_service');
+        var appointmentService = document.getElementById('appointment_service');
+        var waitingListService = document.getElementById('waiting_list_service');
+        var reservationOptions = document.getElementById('reservation_options');
+        var appointmentReasons = document.getElementById('appointment_reasons');
+        var waitingListOptions = document.getElementById('waiting_list_options');
+        var reservationIntervalContainer = document.getElementById('reservation_interval_container');
+        var appointmentIntervalContainer = document.getElementById('appointment_interval_container');
+    
+        reservationOptions.classList.toggle('hidden', !reservationService.checked);
+        appointmentReasons.classList.toggle('hidden', !appointmentService.checked);
+        waitingListOptions.classList.toggle('hidden', !waitingListService.checked);
+        reservationIntervalContainer.classList.toggle('hidden', !reservationService.checked);
+        appointmentIntervalContainer.classList.toggle('hidden', !appointmentService.checked);
+    }
+
+    document.getElementById('reservation_service').addEventListener('change', updateVisibility);
+    document.getElementById('appointment_service').addEventListener('change', updateVisibility);
+    document.getElementById('waiting_list_service').addEventListener('change', updateVisibility);
+
+    // Initial visibility update
+    updateVisibility();
+
+    // Function to update the hidden input with JSON data
+    function updateHiddenInput(listId, hiddenInputId) {
+        const items = Array.from(document.getElementById(listId).children).map(span => span.textContent.trim());
+        document.getElementById(hiddenInputId).value = JSON.stringify(items);
+    }
+
+    // Function to add an item (option or reason)
+    function addItem(inputId, listId, hiddenInputId) {
+        const input = document.getElementById(inputId);
+        const list = document.getElementById(listId);
+        const value = input.value.trim();
         
-        function updateVisibility() {
-            var reservationService = document.getElementById('reservation_service');
-            var appointmentService = document.getElementById('appointment_service');
-            var waitingListService = document.getElementById('waiting_list_service');
-            var reservationOptions = document.getElementById('reservation_options');
-            var appointmentReasons = document.getElementById('appointment_reasons');
-            var waitingListOptions = document.getElementById('waiting_list_options');
-        
-            reservationOptions.classList.toggle('hidden', !reservationService.checked);
-            appointmentReasons.classList.toggle('hidden', !appointmentService.checked);
-            waitingListOptions.classList.toggle('hidden', !waitingListService.checked);
-        }
-
-        document.getElementById('reservation_service').addEventListener('change', updateVisibility);
-        document.getElementById('appointment_service').addEventListener('change', updateVisibility);
-        document.getElementById('waiting_list_service').addEventListener('change', updateVisibility);
-
-        // Initial visibility update
-        updateVisibility();
-
-        document.getElementById('save-changes-btn').addEventListener('click', function(e) {
-            e.preventDefault();
-            console.log('Save button clicked');
-            var form = document.getElementById('edit-service-form');
-            var formData = new FormData(form);
+        if (value !== '' && !itemExists(value, list)) {
+            const span = document.createElement('span');
+            span.className = 'bg-blue-100 text-blue-800 text-sm font-medium mr-2 px-2.5 py-0.5 rounded flex items-center';
+            span.innerHTML = `
+                ${value}
+                <button type="button" class="ml-2 text-blue-600 hover:text-blue-800 focus:outline-none delete-item">
+                    ×
+                </button>
+            `;
+            list.appendChild(span);
             
-            console.log('Form data:', Object.fromEntries(formData));
+            updateHiddenInput(listId, hiddenInputId);
+            input.value = '';
+        } else if (itemExists(value, list)) {
+            alert('This item already exists in the list.');
+        }
+    }
+    
+    function itemExists(value, list) {
+        return Array.from(list.children).some(span => span.textContent.trim().replace('×', '') === value);
+    }
+    
+    function deleteItem(button) {
+        const item = button.closest('span');
+        const list = item.parentElement;
+        const hiddenInputId = list.id === 'reservation_options_list' ? 'reservation_options_input' : 'appointment_reasons_input';
         
-            fetch(form.action, {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRFToken': formData.get('csrfmiddlewaretoken')
-                }
-            })
-            .then(response => {
-                console.log('Response status:', response.status);
-                return response.json();
-            })
-            .then(data => {
-                console.log('Response data:', data);
-                if (data.success) {
-                    document.getElementById('success-message').classList.remove('hidden');
-                    setTimeout(() => {
-                        document.getElementById('success-message').classList.add('hidden');
-                    }, 3000);
-                } else {
-                    console.error('Error:', data.message);
-                }
-            })
-            .catch(error => console.error('Fetch error:', error));
-        });
+        list.removeChild(item);
+        updateHiddenInput(list.id, hiddenInputId);
+    }
+    
+    function updateHiddenInput(listId, hiddenInputId) {
+        const items = Array.from(document.getElementById(listId).children).map(span => span.textContent.trim().replace('×', ''));
+        document.getElementById(hiddenInputId).value = JSON.stringify(items);
+    }
+    
+    // Event listeners
+    document.getElementById('add_reservation_option').addEventListener('click', function() {
+        addItem('reservation_option_input', 'reservation_options_list', 'reservation_options_input');
+    });
+    
+    document.getElementById('add_appointment_reason').addEventListener('click', function() {
+        addItem('appointment_reason_input', 'appointment_reasons_list', 'appointment_reasons_input');
+    });
+    
+    document.addEventListener('click', function(e) {
+        if (e.target && e.target.classList.contains('delete-item')) {
+            deleteItem(e.target);
+        }
+    });
 
-        document.querySelectorAll('[id^="working_day_"]').forEach(checkbox => {
-            checkbox.addEventListener('change', function() {
-                const day = this.id.split('_')[2];
-                const openingTime = document.getElementById(`opening_time_${day}`);
-                const closingTime = document.getElementById(`closing_time_${day}`);
-                
-                openingTime.disabled = !this.checked;
-                closingTime.disabled = !this.checked;
-            });
+    document.getElementById('enable_time_estimation').addEventListener('change', function() {
+        document.getElementById('time_per_customer_container').classList.toggle('hidden', !this.checked);
+    });
+
+// Initialize reservation options and appointment reasons
+    function initializeList(listId, hiddenInputId, items) {
+        const list = document.getElementById(listId);
+        list.innerHTML = ''; // Clear existing items
+        items.forEach(item => {
+            const span = document.createElement('span');
+            span.className = 'bg-blue-100 text-blue-800 text-sm font-medium mr-2 px-2.5 py-0.5 rounded flex items-center';
+            span.innerHTML = `
+                ${item}
+                <button type="button" class="ml-2 text-blue-600 hover:text-blue-800 focus:outline-none delete-item">
+                    ×
+                </button>
+            `;
+            list.appendChild(span);
+        });
+        updateHiddenInput(listId, hiddenInputId);
+    }
+
+    // Parse and initialize the lists
+    try {
+        const reservationOptions = JSON.parse('{{ reservation_options|escapejs }}');
+        const appointmentReasons = JSON.parse('{{ appointment_reasons|escapejs }}');
+        
+        initializeList('reservation_options_list', 'reservation_options_input', reservationOptions);
+        initializeList('appointment_reasons_list', 'appointment_reasons_input', appointmentReasons);
+    } catch (error) {
+        console.error('Error parsing JSON:', error);
+    }
+
+
+    document.getElementById('save-changes-btn').addEventListener('click', function(e) {
+        e.preventDefault();
+        console.log('Save button clicked');
+        var form = document.getElementById('edit-service-form');
+        var formData = new FormData(form);
+        
+        console.log('Form data:', Object.fromEntries(formData));
+    
+        fetch(form.action, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+            }
+        })
+        .then(response => {
+            console.log('Response status:', response.status);
+            return response.json();
+        })
+        .then(data => {
+            console.log('Response data:', data);
+            if (data.success) {
+                document.getElementById('success-message').classList.remove('hidden');
+                setTimeout(() => {
+                    document.getElementById('success-message').classList.add('hidden');
+                }, 3000);
+
+                alert('Changes saved successfully!');
+            } else {
+                console.error('Error:', data.message);
+                alert('Error saving changes: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Fetch error:', error);
+            alert('An error occurred while saving changes. Please try again.');
         });
     });
+
+    document.querySelectorAll('[id^="working_day_"]').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const day = this.id.split('_')[2];
+            const openingTime = document.getElementById(`opening_time_${day}`);
+            const closingTime = document.getElementById(`closing_time_${day}`);
+            
+            openingTime.disabled = !this.checked;
+            closingTime.disabled = !this.checked;
+        });
+    });
+});
 </script>
 {% endblock %}

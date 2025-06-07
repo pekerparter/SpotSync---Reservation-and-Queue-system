@@ -266,7 +266,8 @@ def add_to_queue(request, business_id):
             return JsonResponse({
                 'status': 'success',
                 'message': 'You have been added to the queue.',
-                'position': new_position
+                'position': new_position,
+                'estimated_wait_time': queue_entry.estimated_wait_time
             })
     except IntegrityError:
         return JsonResponse({'status': 'error', 'message': 'An error occurred. Please try again.'})
@@ -430,6 +431,7 @@ def make_reservation(request, business_id):
         business=business,
         date=date,
         time=time,
+        option=option if option != '' else None,
         status__in=['booked', 'in_queue']  # Only consider active reservations
     ).exists()
 
@@ -849,6 +851,7 @@ from django.db import transaction
 from django.http import JsonResponse
 from .models import Business, Category, BusinessHours
 from datetime import datetime
+import json
 
 @login_required
 @user_passes_test(lambda u: u.is_business_staff)
@@ -896,10 +899,15 @@ def edit_service(request, business_id):
                     business_hours.save()
 
             # Handle other fields
-            business.reservation_options = request.POST.get('reservation_options', '').split('\n')
-            business.appointment_reasons = request.POST.get('appointment_reasons', '').split('\n')
+            reservation_options = json.loads(request.POST.get('reservation_options', '[]'))
+            appointment_reasons = json.loads(request.POST.get('appointment_reasons', '[]'))
+
+            business.reservation_options = [option.strip() for option in reservation_options if option.strip()]
+            business.appointment_reasons = [reason.strip() for reason in appointment_reasons if reason.strip()]
             business.reservation_interval = int(request.POST.get('reservation_interval', 60))
             business.appointment_interval = int(request.POST.get('appointment_interval', 30))
+            business.enable_time_estimation = request.POST.get('enable_time_estimation') == 'on'
+            business.time_per_customer = int(request.POST.get('time_per_customer', 0)) or None
 
             business.save()
 
@@ -914,5 +922,7 @@ def edit_service(request, business_id):
         'business': business,
         'current_categories': current_categories,
         'business_hours': business_hours,
+        'reservation_options': json.dumps(business.reservation_options),
+        'appointment_reasons': json.dumps(business.appointment_reasons),
     }
     return render(request, 'accounts/edit_service.html', context)

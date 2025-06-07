@@ -60,6 +60,8 @@ class Business(models.Model):
     categories = models.ManyToManyField(Category, related_name='businesses')
     image = models.ImageField(upload_to='business_images/', null=True, blank=True)
     people_in_queue = models.IntegerField(default=0)
+    enable_time_estimation = models.BooleanField(default=False)
+    time_per_customer = models.PositiveIntegerField(null=True, blank=True)
     estimated_wait_time = models.IntegerField(default=0)  # in minutes
     reservation_options = models.JSONField(null=True, blank=True)
     appointment_reasons = models.JSONField(null=True, blank=True)
@@ -82,16 +84,22 @@ class Business(models.Model):
         return hours
     
     def update_people_in_queue(self):
-        active_queue_count = self.queue_set.filter(
-            status='in_queue'
-        ).count()
-        self.people_in_queue = active_queue_count
-        self.save(update_fields=['people_in_queue'])
+        active_queue_count = self.queue_set.filter(status='in_queue').count()
+        if self.people_in_queue != active_queue_count:
+            self.people_in_queue = active_queue_count
+            self.save(update_fields=['people_in_queue'])
+        
         return self.people_in_queue
-
     def get_people_in_queue(self):
         return self.update_people_in_queue()
     
+    def update_estimated_wait_time(self):
+        if self.enable_time_estimation and self.time_per_customer:
+            self.estimated_wait_time = self.people_in_queue * self.time_per_customer
+        else:
+            self.estimated_wait_time = 0
+        self.save(update_fields=['estimated_wait_time'])
+
     def get_role_permissions(self, role):
         try:
             return self.role_permissions.get(role=role)
@@ -142,6 +150,7 @@ class Queue(models.Model):
     time = models.TimeField(default=timezone.now)
     created_at = models.DateTimeField(auto_now_add=True)
     position = models.PositiveIntegerField(null=True, blank=True)
+    estimated_wait_time = models.IntegerField(default=0)  # in minutes
     status = models.CharField(max_length=20, default='in_queue', choices=[
         ('in_queue', 'In Queue'),
         ('cancelled', 'Cancelled'),
@@ -156,12 +165,17 @@ class Queue(models.Model):
                 user=self.user,
                 status='in_queue'
             ).update(status='cancelled')
-
+    
             # Set the position for the new entry
             self.position = self.business.get_next_queue_position()
-
+    
+            # Calculate estimated wait time
+            if self.business.enable_time_estimation and self.business.time_per_customer:
+                self.estimated_wait_time = self.position * self.business.time_per_customer
+    
         super().save(*args, **kwargs)
-        self.business.update_queue_positions()
+        self.business.update_people_in_queue()
+        self.business.update_estimated_wait_time()
 
     def delete(self, *args, **kwargs):
         business = self.business

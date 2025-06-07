@@ -21,8 +21,9 @@
                 <p class="text-gray-600 mb-2"><strong>Address:</strong> {{ business.address }}</p>
                 <p class="text-gray-600 mb-4"><strong>Phone:</strong> {{ business.phone_number }}</p>
                 <p class="mb-2"><strong>People in queue:</strong> {{ business.people_in_queue }}</p>
+                {%if business.enable_time_estimation%}
                 <p class="mb-4"><strong>Estimated wait time:</strong> {{ business.estimated_wait_time }} mins</p>
-
+                {% endif %}
                 {% if user_in_queue %}
                     <p class="mb-2"><strong>Your position:</strong> {{ position }}</p>
                     <p class="mb-4"><strong>People ahead of you:</strong> {{ people_ahead }}</p>

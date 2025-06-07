@@ -29,6 +29,27 @@ class Category(models.Model):
 
     def __str__(self):
         return self.name
+    
+class BusinessHours(models.Model):
+    DAYS_OF_WEEK = [
+        (0, 'Monday'),
+        (1, 'Tuesday'),
+        (2, 'Wednesday'),
+        (3, 'Thursday'),
+        (4, 'Friday'),
+        (5, 'Saturday'),
+        (6, 'Sunday'),
+    ]
+    
+    business = models.ForeignKey('Business', on_delete=models.CASCADE, related_name='business_hours')
+    day = models.IntegerField(choices=DAYS_OF_WEEK)
+    is_working_day = models.BooleanField(default=True)
+    opening_time = models.TimeField(max_length=5, default="09:00")  # Store as "HH:MM"
+    closing_time = models.TimeField(max_length=5, default="21:00")  # Store as "HH:MM"
+
+    class Meta:
+        unique_together = ('business', 'day')
+
 
 class Business(models.Model):
     name = models.CharField(max_length=100)
@@ -42,7 +63,24 @@ class Business(models.Model):
     estimated_wait_time = models.IntegerField(default=0)  # in minutes
     reservation_options = models.JSONField(null=True, blank=True)
     appointment_reasons = models.JSONField(null=True, blank=True)
+    reservation_interval = models.IntegerField(default=60, null=True)  # Default to 60 minutes
+    appointment_interval = models.IntegerField(default=30, null=True)  # Default to 30 minutes
 
+    def get_business_hours(self):
+        hours = self.business_hours.all()
+        if not hours:
+            # Create default business hours if not exist
+            for day in range(7):
+                BusinessHours.objects.create(
+                    business=self,
+                    day=day,
+                    is_working_day=True if day < 5 else False,  # Mon-Fri working, Sat-Sun off
+                    opening_time='09:00',
+                    closing_time='17:00'
+                )
+            hours = self.business_hours.all()
+        return hours
+    
     def update_people_in_queue(self):
         active_queue_count = self.queue_set.filter(
             status='in_queue'

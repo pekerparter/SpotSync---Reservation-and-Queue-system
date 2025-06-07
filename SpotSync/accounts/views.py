@@ -66,7 +66,7 @@ def landing_page(request):
     categories = Category.objects.all()[:3]  # Limit to 3 categories for the landing page
     
     # Get the nearest upcoming reservation or appointment
-    now = timezone.now()
+    now = timezone.localtime()
     upcoming_booking = None
     
     # Check for the nearest reservation
@@ -218,49 +218,59 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from .models import Business, Queue
 from django.utils import timezone
+from datetime import time
 
 @require_POST
 @login_required
 def add_to_queue(request, business_id):
-    try:
-        business = get_object_or_404(Business, id=business_id)
+    business = get_object_or_404(Business, id=business_id)
+    
+    # Get current day and time
+    now = timezone.localtime()
+    current_day = now.weekday()
+    current_time = now.time()
 
+    # Get business hours for the current day
+    business_hours = BusinessHours.objects.filter(business=business, day=current_day).first()
+
+    if not business_hours or not business_hours.is_working_day:
+        return JsonResponse({'status': 'error', 'message': 'The business is closed today.'})
+
+    opening_time = business_hours.opening_time
+    closing_time = business_hours.closing_time
+
+    # Check if current time is within business hours
+    if current_time < opening_time or current_time > closing_time:
+        return JsonResponse({'status': 'error', 'message': 'The business is currently closed.'})
+
+    # Proceed with adding to queue if within business hours
+    try:
         with transaction.atomic():
-            existing_queue = Queue.objects.filter(
+            # Check if user is already in queue
+            existing_queue = Queue.objects.filter(user=request.user, business=business, status='in_queue').first()
+            if existing_queue:
+                return JsonResponse({'status': 'error', 'message': 'You are already in the queue.'})
+
+            # Get the last position in the queue
+            last_queue = Queue.objects.filter(business=business, status='in_queue').order_by('-position').first()
+            new_position = last_queue.position + 1 if last_queue else 1
+
+            # Create new queue entry
+            queue_entry = Queue.objects.create(
                 user=request.user,
                 business=business,
+                position=new_position,
                 status='in_queue'
-            ).first()
+            )
 
-            if existing_queue:
-                return JsonResponse({
-                    'status': 'error',
-                    'message': 'You are already in the queue for this business.',
-                    'position': existing_queue.position,
-                    'people_ahead': existing_queue.people_ahead
-                })
-            else:
-                new_queue_entry = Queue.objects.create(
-                    user=request.user,
-                    business=business,
-                    status='in_queue',
-                    date=timezone.now().date(),
-                    time=timezone.now().time()
-                )
-                
-                business.update_queue_positions()
-
-                return JsonResponse({
-                    'status': 'success',
-                    'message': 'You have been added to the queue.',
-                    'position': new_queue_entry.position,
-                    'people_ahead': new_queue_entry.people_ahead
-                })
-
+            return JsonResponse({
+                'status': 'success',
+                'message': 'You have been added to the queue.',
+                'position': new_position
+            })
     except IntegrityError:
-        return JsonResponse({'status': 'error', 'message': 'An error occurred while adding you to the queue.'})
-    except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)})
+        return JsonResponse({'status': 'error', 'message': 'An error occurred. Please try again.'})
+    
 @login_required
 def remove_from_queue(request, business_id):
     business = get_object_or_404(Business, id=business_id)
@@ -396,7 +406,7 @@ def waiting_list(request, business_id):
 
 def reservation(request, business_id):
     business = get_object_or_404(Business, id=business_id)
-    today = timezone.localtime(timezone.now()).date()
+    today = timezone.localtime().date()
     context = {
         'business': business,
         'reservation_options': business.reservation_options or []
@@ -450,6 +460,7 @@ def appointment(request, business_id):
 import logging
 logger = logging.getLogger(__name__)
 
+
 @require_GET
 def get_available_reservation_slots(request, business_id):
     logger.info(f"Fetching slots for business_id: {business_id}")
@@ -464,14 +475,21 @@ def get_available_reservation_slots(request, business_id):
         logger.error(f"Invalid date format: {date_str}")
         return JsonResponse({'error': 'Invalid date format'}, status=400)
 
+    # Get business hours for the specific day
+    day_of_week = date.weekday()
+    business_hours = BusinessHours.objects.filter(business=business, day=day_of_week, is_working_day=True).first()
+
+    if not business_hours:
+        return JsonResponse({'slots': []})  # No slots available on this day
+
     # Generate time slots from opening time to closing time
-    start_time = timezone.make_aware(datetime.combine(date, datetime.strptime(business.opening_time, '%H:%M').time()))
-    end_time = timezone.make_aware(datetime.combine(date, datetime.strptime(business.closing_time, '%H:%M').time()))
+    start_time = timezone.make_aware(datetime.combine(date, business_hours.opening_time))
+    end_time = timezone.make_aware(datetime.combine(date, business_hours.closing_time))
     logger.info(f"Start time: {start_time}, End time: {end_time}")
 
     time_slots = []
     current_time = start_time
-    now = timezone.localtime(timezone.now())
+    now = timezone.localtime()
     
     while current_time < end_time:
         time_slot = current_time.strftime('%H:%M')
@@ -503,7 +521,7 @@ def get_available_reservation_slots(request, business_id):
             'time': time_slot,
             'available': is_available
         })
-        current_time += timedelta(minutes=60)  # 1-hour slots
+        current_time += timedelta(minutes=business.reservation_interval)
 
     logger.info(f"Generated {len(time_slots)} time slots")
     return JsonResponse({'slots': time_slots})
@@ -514,13 +532,20 @@ def get_available_appointment_slots(request, business_id):
     date_str = request.GET.get('date')
     date = datetime.strptime(date_str, '%Y-%m-%d').date()
 
-    # Generate time slots for appointments (example: 30-minute slots)
-    start_time = timezone.make_aware(datetime.combine(date, datetime.strptime(business.opening_time, '%H:%M').time()))
-    end_time = timezone.make_aware(datetime.combine(date, datetime.strptime(business.closing_time, '%H:%M').time()))
+    # Get business hours for the specific day
+    day_of_week = date.weekday()
+    business_hours = BusinessHours.objects.filter(business=business, day=day_of_week, is_working_day=True).first()
+
+    if not business_hours:
+        return JsonResponse({'slots': []})  # No slots available on this day
+
+    # Generate time slots for appointments
+    start_time = timezone.make_aware(datetime.combine(date, business_hours.opening_time))
+    end_time = timezone.make_aware(datetime.combine(date, business_hours.closing_time))
     time_slots = []
 
     current_time = start_time
-    now = timezone.localtime(timezone.now())
+    now = timezone.localtime()
     
     while current_time < end_time:
         time_slot = current_time.strftime('%H:%M')
@@ -544,7 +569,7 @@ def get_available_appointment_slots(request, business_id):
             'time': time_slot,
             'available': is_available
         })
-        current_time += timedelta(minutes=30)
+        current_time += timedelta(minutes=business.appointment_interval)
 
     return JsonResponse({'slots': time_slots})
 
@@ -815,3 +840,79 @@ def update_booking_status(request, booking_type, booking_id):
         return JsonResponse({'success': True, 'message': 'Booking status updated successfully'})
     except Exception as e:
         return JsonResponse({'success': False, 'message': str(e)})
+    
+
+
+from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.db import transaction
+from django.http import JsonResponse
+from .models import Business, Category, BusinessHours
+from datetime import datetime
+
+@login_required
+@user_passes_test(lambda u: u.is_business_staff)
+def edit_service(request, business_id):
+    business = get_object_or_404(Business, id=business_id)
+    
+    if request.method == 'POST':
+        
+        with transaction.atomic():
+            # Handle service types
+            service_types = request.POST.getlist('service_types')
+            business.categories.clear()
+            for service_type in service_types:
+                category_name = {
+                    'reservations': 'Reservations',
+                    'appointments': 'Appointments',
+                    'Waiting list': 'Waiting list'
+                }.get(service_type)
+                if category_name:
+                    category, _ = Category.objects.get_or_create(name=category_name)
+                    business.categories.add(category)
+                else:
+                    print(f"Unexpected service type: {service_type}")
+
+            # Handle business hours
+            for day in range(7):
+                is_working_day = request.POST.get(f'working_day_{day}') == 'on'
+                opening_time = request.POST.get(f'opening_time_{day}')
+                closing_time = request.POST.get(f'closing_time_{day}')
+
+                business_hours, created = BusinessHours.objects.get_or_create(
+                    business=business,
+                    day=day,
+                    defaults={
+                        'is_working_day': is_working_day,
+                        'opening_time': opening_time or '09:00',  # Default to 09:00 if not provided
+                        'closing_time': closing_time or '17:00'   # Default to 17:00 if not provided
+                    }
+                )
+
+                if not created:
+                    business_hours.is_working_day = is_working_day
+                    business_hours.opening_time = opening_time or business_hours.opening_time
+                    business_hours.closing_time = closing_time or business_hours.closing_time
+                    business_hours.save()
+
+            # Handle other fields
+            business.reservation_options = request.POST.get('reservation_options', '').split('\n')
+            business.appointment_reasons = request.POST.get('appointment_reasons', '').split('\n')
+            business.reservation_interval = int(request.POST.get('reservation_interval', 60))
+            business.appointment_interval = int(request.POST.get('appointment_interval', 30))
+
+            business.save()
+
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': True})
+        return redirect('business_portal')
+    
+    current_categories = list(business.categories.values_list('name', flat=True))
+    business_hours = business.get_business_hours()
+    
+    context = {
+        'business': business,
+        'current_categories': current_categories,
+        'business_hours': business_hours,
+    }
+    return render(request, 'accounts/edit_service.html', context)

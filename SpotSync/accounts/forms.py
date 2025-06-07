@@ -1,6 +1,6 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm, PasswordResetForm
-from .models import CustomUser
+from .models import CustomUser, Business
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import PasswordResetForm
 
@@ -71,3 +71,39 @@ class UserProfileForm(forms.ModelForm):
         if CustomUser.objects.filter(email=email).exclude(pk=self.instance.pk).exists():
             raise forms.ValidationError("This email is already in use.")
         return email
+
+class EditServiceForm(forms.ModelForm):
+    class Meta:
+        model = Business
+        fields = ['opening_time', 'closing_time', 'categories', 'reservation_options', 'appointment_reasons']
+        widgets = {
+            'opening_time': forms.TimeInput(attrs={'type': 'time'}),
+            'closing_time': forms.TimeInput(attrs={'type': 'time'}),
+        }
+
+    reservation_options = forms.CharField(required=False, widget=forms.Textarea(attrs={'placeholder': 'Enter options, one per line'}))
+    appointment_reasons = forms.CharField(required=False, widget=forms.Textarea(attrs={'placeholder': 'Enter reasons, one per line'}))
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.reservation_options:
+            self.fields['reservation_options'].initial = '\n'.join(self.instance.reservation_options)
+        if self.instance.appointment_reasons:
+            self.fields['appointment_reasons'].initial = '\n'.join(self.instance.appointment_reasons)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        reservation_options = cleaned_data.get('reservation_options')
+        appointment_reasons = cleaned_data.get('appointment_reasons')
+
+        if reservation_options:
+            cleaned_data['reservation_options'] = [option.strip() for option in reservation_options.split('\n') if option.strip()]
+        else:
+            cleaned_data['reservation_options'] = None
+
+        if appointment_reasons:
+            cleaned_data['appointment_reasons'] = [reason.strip() for reason in appointment_reasons.split('\n') if reason.strip()]
+        else:
+            cleaned_data['appointment_reasons'] = None
+
+        return cleaned_data

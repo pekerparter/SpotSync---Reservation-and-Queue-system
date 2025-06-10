@@ -21,9 +21,10 @@
                 <p class="text-gray-600 mb-2"><strong>Address:</strong> {{ business.address }}</p>
                 <p class="text-gray-600 mb-4"><strong>Phone:</strong> {{ business.phone_number }}</p>
                 <p class="mb-2"><strong>People in queue:</strong> {{ business.people_in_queue }}</p>
-                {%if business.enable_time_estimation%}
+                {% if business.enable_time_estimation %}
                 <p class="mb-4"><strong>Estimated wait time:</strong> {{ business.estimated_wait_time }} mins</p>
                 {% endif %}
+                <p class="mb-4"><strong>Status:</strong> {% if is_open %}<span class="text-green-600">Open</span>{% else %}<span class="text-red-600">Closed</span>{% endif %}</p>
                 {% if user_in_queue %}
                     <p class="mb-2"><strong>Your position:</strong> {{ position }}</p>
                     <p class="mb-4"><strong>People ahead of you:</strong> {{ people_ahead }}</p>
@@ -31,9 +32,12 @@
                         Remove from queue
                     </button>
                 {% else %}
-                    <button id="addToQueue" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                    <button id="addToQueue" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded{% if not is_open %} opacity-50 cursor-not-allowed{% endif %}"{% if not is_open %} disabled{% endif %}>
                         Add to queue
                     </button>
+                    {% if not is_open %}
+                    <p class="text-red-600 mt-2">The business is currently closed. You cannot join the queue at this time.</p>
+                    {% endif %}
                 {% endif %}
             </div>
         </div>
@@ -46,6 +50,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (addToQueueBtn) {
         addToQueueBtn.addEventListener('click', function() {
+            if (this.disabled) return;  // Don't proceed if the button is disabled
             fetch('{% url "add_to_queue" business.id %}', {
                 method: 'POST',
                 headers: {

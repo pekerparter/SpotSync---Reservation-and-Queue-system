@@ -1,7 +1,8 @@
 from django.db import models, transaction
 from django.contrib.auth.models import AbstractUser, UserManager
 from django.utils import timezone
-
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 
 class CustomUser(AbstractUser):
     STAFF_ROLES = [
@@ -63,25 +64,28 @@ class Business(models.Model):
     enable_time_estimation = models.BooleanField(default=False)
     time_per_customer = models.PositiveIntegerField(null=True, blank=True)
     estimated_wait_time = models.IntegerField(default=0)  # in minutes
-    reservation_options = models.JSONField(null=True, blank=True)
-    appointment_reasons = models.JSONField(null=True, blank=True)
+    reservation_options = models.JSONField(default=list, blank=True)
+    appointment_reasons = models.JSONField(default=list, blank=True)
     reservation_interval = models.IntegerField(default=60, null=True)  # Default to 60 minutes
     appointment_interval = models.IntegerField(default=30, null=True)  # Default to 30 minutes
 
     def get_business_hours(self):
         hours = self.business_hours.all()
         if not hours:
-            # Create default business hours if not exist
-            for day in range(7):
-                BusinessHours.objects.create(
-                    business=self,
-                    day=day,
-                    is_working_day=True if day < 5 else False,  # Mon-Fri working, Sat-Sun off
-                    opening_time='09:00',
-                    closing_time='17:00'
-                )
+            self.create_default_business_hours()
             hours = self.business_hours.all()
         return hours
+
+    def create_default_business_hours(self):
+        for day in range(7):
+            BusinessHours.objects.create(
+                business=self,
+                day=day,
+                is_working_day=True if day < 5 else False,  # Mon-Fri working, Sat-Sun off
+                opening_time='09:00',
+                closing_time='17:00'
+            )
+
     
     def update_people_in_queue(self):
         active_queue_count = self.queue_set.filter(status='in_queue').count()
@@ -143,6 +147,12 @@ class Business(models.Model):
             self.people_in_queue = active_queue_count
             self.save(update_fields=['people_in_queue'])
 
+@receiver(post_save, sender=Business)
+def create_business_hours(sender, instance, created, **kwargs):
+    if created:
+        instance.create_default_business_hours()
+
+        
 class Queue(models.Model):
     business = models.ForeignKey(Business, on_delete=models.CASCADE)
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)

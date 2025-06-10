@@ -392,15 +392,27 @@ def waiting_list(request, business_id):
     business = get_object_or_404(Business, id=business_id)
     queue_entry = Queue.objects.filter(user=request.user, business=business, status='in_queue').first()
 
+    # Check if the business is open
+    now = timezone.localtime()
+    current_day = now.weekday()
+    current_time = now.time()
+    business_hours = BusinessHours.objects.filter(business=business, day=current_day).first()
+    
+    is_open = False
+    if business_hours and business_hours.is_working_day:
+        if business_hours.opening_time <= current_time <= business_hours.closing_time:
+            is_open = True
+
     context = {
         'business': business,
         'user_in_queue': bool(queue_entry),
+        'is_open': is_open,
     }
 
     if queue_entry:
         context.update({
             'position': queue_entry.position,
-            'people_ahead': queue_entry.people_ahead
+            'people_ahead': queue_entry.people_ahead,
         })
 
     return render(request, 'accounts/waiting_list.html', context)

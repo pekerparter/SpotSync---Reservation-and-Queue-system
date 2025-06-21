@@ -68,6 +68,8 @@ class Business(models.Model):
     appointment_reasons = models.JSONField(default=list, blank=True)
     reservation_interval = models.IntegerField(default=60, null=True)  # Default to 60 minutes
     appointment_interval = models.IntegerField(default=30, null=True)  # Default to 30 minutes
+    latitude = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
 
     def get_business_hours(self):
         hours = self.business_hours.all()

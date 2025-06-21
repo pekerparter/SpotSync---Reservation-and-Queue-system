@@ -45,10 +45,34 @@
                             Book Appointment
                         </a>
                     {% endif %}
+                    {% if business.latitude and business.longitude %}
+                    <div id="map" style="height: 400px; width: 100%;"></div>
+                    {% endif %}
+                    
+                    <a href="https://www.google.com/maps/search/?api=1&query={{ business.latitude }},{{ business.longitude }}" target="_blank" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-4 inline-block">
+                        View on Google Maps
+                    </a>
+                </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
-{% endblock %}
 
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAFzlMWUIi6p2iRFo_xIcbCwxqprLLN0Jc"></script>
+<script>
+    function initMap() {
+        var location = {lat: {{ business.latitude }}, lng: {{ business.longitude }}};
+        var map = new google.maps.Map(document.getElementById('map'), {
+            zoom: 15,
+            center: location
+        });
+        var marker = new google.maps.Marker({
+            position: location,
+            map: map
+        });
+    }
+    initMap();
+</script>
+
+{% endblock %}

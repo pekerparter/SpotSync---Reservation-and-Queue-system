@@ -24,15 +24,20 @@
         <h2 class="text-xl font-semibold mb-2">Current Staff</h2>
         <div id="staff-list">
             {% for staff in staff_members %}
-            <div class="bg-blue-100 p-4 rounded mb-2 flex justify-between items-center">
-                <div>
-                    <span class="font-semibold">{{ staff.get_full_name }}</span>
-                    <span class="text-gray-600 ml-2">{{ staff.email }}</span>
-                    <span class="bg-blue-500 text-white px-2 py-1 rounded ml-2">{{ staff.get_staff_role_display }}</span>
+            <div class="bg-blue-100 p-4 rounded mb-2 flex justify-between items-center" data-staff-id="{{ staff.id }}">
+                <div class="staff-info">
+                    <span class="font-semibold staff-name">{{ staff.get_full_name }}</span>
+                    <span class="text-gray-600 ml-2 staff-email">{{ staff.email }}</span>
+                    <span class="bg-blue-500 text-white px-2 py-1 rounded ml-2 staff-role">{{ staff.get_staff_role_display }}</span>
                 </div>
-                <button class="delete-staff bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded" data-staff-id="{{ staff.id }}">
-                    Delete
-                </button>
+                <div class="staff-actions">
+                    <button class="edit-staff bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded mr-2">
+                        Edit
+                    </button>
+                    <button class="delete-staff bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded" data-staff-id="{{ staff.id }}">
+                        Delete
+                    </button>
+                </div>
             </div>
             {% endfor %}
         </div>
@@ -73,7 +78,7 @@
                         <td class="px-4 py-2"><input type="checkbox" id="manager-edit-staff" name="manager-edit-staff"></td>
                         <td class="px-4 py-2"><input type="checkbox" id="worker-edit-staff" name="worker-edit-staff"></td>
                     </tr>
-                    <tr>
+                    <tr class= hidden>
                         <td class="px-4 py-2">Availability</td>
                         <td class="px-4 py-2"><input type="checkbox" id="owner-availability" name="owner-availability"></td>
                         <td class="px-4 py-2"><input type="checkbox" id="manager-availability" name="manager-availability"></td>
@@ -295,6 +300,112 @@ document.addEventListener('DOMContentLoaded', function() {
             alert('An error occurred while adding the staff member.');
         });
     });
+    function editStaffMember() {
+        const staffDiv = this.closest('[data-staff-id]');
+        const staffId = staffDiv.dataset.staffId;
+        const staffInfo = staffDiv.querySelector('.staff-info');
+        const staffActions = staffDiv.querySelector('.staff-actions');
+    
+        const nameSpan = staffInfo.querySelector('.staff-name');
+        const emailSpan = staffInfo.querySelector('.staff-email');
+        const roleSpan = staffInfo.querySelector('.staff-role');
+    
+        const name = nameSpan.textContent;
+        const email = emailSpan.textContent;
+        const role = roleSpan.textContent;
+    
+        // Store original values
+        staffDiv.dataset.originalName = name;
+        staffDiv.dataset.originalEmail = email;
+        staffDiv.dataset.originalRole = role;
+    
+        // Replace info with editable fields
+        staffInfo.innerHTML = `
+            <input type="email" class="edit-email border rounded px-2 py-1 mr-2" value="${email}">
+            <select class="edit-role border rounded px-2 py-1">
+                <option value="WORKER" ${role === 'Worker' ? 'selected' : ''}>Worker</option>
+                <option value="MANAGER" ${role === 'Manager' ? 'selected' : ''}>Manager</option>
+                <option value="OWNER" ${role === 'Owner' ? 'selected' : ''}>Owner</option>
+            </select>
+        `;
+    
+        // Replace actions with save and discard buttons
+        staffActions.innerHTML = `
+            <button class="save-edit bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded mr-2">
+                Save
+            </button>
+            <button class="discard-edit bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                Discard
+            </button>
+        `;
+    
+        // Add event listeners for save and discard
+        staffActions.querySelector('.save-edit').addEventListener('click', function() {
+            const newEmail = staffInfo.querySelector('.edit-email').value;
+            const newRole = staffInfo.querySelector('.edit-role').value;
+
+            // Send update request to server
+            fetch(`/accounts/update-staff-member/{{ business.id }}/${staffId}/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ email: newEmail, role: newRole }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update the staff info
+                    staffInfo.innerHTML = `
+                        <span class="font-semibold staff-name">${data.full_name}</span>
+                        <span class="text-gray-600 ml-2 staff-email">${newEmail}</span>
+                        <span class="bg-blue-500 text-white px-2 py-1 rounded ml-2 staff-role">${data.role}</span>
+                    `;
+                    // Restore original actions
+                    restoreOriginalActions(staffActions, staffId);
+                    alert('Staff member updated successfully.');
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while updating the staff member.');
+            });
+        });
+
+        staffActions.querySelector('.discard-edit').addEventListener('click', function() {
+            // Restore original info
+            staffInfo.innerHTML = `
+                <span class="font-semibold staff-name">${staffDiv.dataset.originalName}</span>
+                <span class="text-gray-600 ml-2 staff-email">${staffDiv.dataset.originalEmail}</span>
+                <span class="bg-blue-500 text-white px-2 py-1 rounded ml-2 staff-role">${staffDiv.dataset.originalRole}</span>
+            `;
+            // Restore original actions
+            restoreOriginalActions(staffActions, staffId);
+        });
+    }
+    document.querySelectorAll('.edit-staff').forEach(button => {
+    button.addEventListener('click', editStaffMember);
+});
+
+    function restoreOriginalActions(staffActions, staffId) {
+        staffActions.innerHTML = `
+            <button class="edit-staff bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded mr-2">
+                Edit
+            </button>
+            <button class="delete-staff bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded" data-staff-id="${staffId}">
+                Delete
+            </button>
+        `;
+        // Re-add event listeners
+        staffActions.querySelector('.edit-staff').addEventListener('click', editStaffMember);
+        staffActions.querySelector('.delete-staff').addEventListener('click', function() {
+            showDeleteConfirmation(staffId);
+        });
+    }
+
 });
 </script>
 {% endblock %}

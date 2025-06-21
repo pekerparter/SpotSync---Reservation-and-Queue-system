@@ -15,6 +15,7 @@
                         <span class="text-gray-500 text-center px-4">No image available</span>
                     </div>
                 {% endif %}
+                
             </div>
             <div class="p-8">
                 <h2 class="text-xl font-semibold mb-2">{{ business.name }}</h2>
@@ -39,7 +40,16 @@
                     <p class="text-red-600 mt-2">The business is currently closed. You cannot join the queue at this time.</p>
                     {% endif %}
                 {% endif %}
-            </div>
+            <br/>
+                {% if business.latitude and business.longitude %}
+                <div id="map" style="height: 300px; width: 100%; margin-top: 20px;"></div>
+                
+                
+                <a href="https://www.google.com/maps/search/?api=1&query={{ business.latitude }},{{ business.longitude }}" target="_blank" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-4 inline-block">
+                    View on Google Maps
+                </a>
+                </div>
+                {% endif %}
         </div>
     </div>
 </div>
@@ -91,6 +101,24 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+function initMap() {
+    var location = {lat: {{ business.latitude }}, lng: {{ business.longitude }}};
+    var map = new google.maps.Map(document.getElementById('map'), {
+        zoom: 15,
+        center: location
+    });
+    var marker = new google.maps.Marker({
+        position: location,
+        map: map
+    });
+}
+
+// Call initMap when the page loads
+if (document.getElementById('map')) {
+    initMap();
+}
 </script>
+
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAFzlMWUIi6p2iRFo_xIcbCwxqprLLN0Jc&libraries=places&callback=initMap" async defer></script>
 
 {% endblock %}

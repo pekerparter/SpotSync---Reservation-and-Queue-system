@@ -12,6 +12,8 @@ from .models import *
 from .forms import CustomUserCreationForm, PasswordResetForm, UserProfileForm
 from django.utils import timezone
 from django.http import Http404
+from django.conf import settings
+import requests
 
 def register_view(request):
     if request.method == 'POST':
@@ -407,6 +409,7 @@ def waiting_list(request, business_id):
         'business': business,
         'user_in_queue': bool(queue_entry),
         'is_open': is_open,
+        'GOOGLE_MAPS_API_KEY': settings.GOOGLE_MAPS_API_KEY,
     }
 
     if queue_entry:
@@ -422,7 +425,8 @@ def reservation(request, business_id):
     today = timezone.localtime().date()
     context = {
         'business': business,
-        'reservation_options': business.reservation_options or []
+        'reservation_options': business.reservation_options or [],
+        'GOOGLE_MAPS_API_KEY': settings.GOOGLE_MAPS_API_KEY,
     }
     return render(request, 'accounts/reservation.html', context)
 
@@ -466,7 +470,8 @@ def appointment(request, business_id):
     business = get_object_or_404(Business, id=business_id)
     context = {
         'business': business,
-        'appointment_reasons': business.appointment_reasons or []
+        'appointment_reasons': business.appointment_reasons or [],
+        'GOOGLE_MAPS_API_KEY': settings.GOOGLE_MAPS_API_KEY,
     }
     return render(request, 'accounts/appointment.html', context)
 
@@ -787,16 +792,30 @@ def edit_business_info(request, business_id):
         business.name = request.POST.get('name')
         business.address = request.POST.get('address')
         business.phone_number = request.POST.get('phone_number')
+        latitude = request.POST.get('latitude')
+        longitude = request.POST.get('longitude')
+        if latitude and longitude:
+            business.latitude = float(latitude)
+            business.longitude = float(longitude)
 
         if 'image' in request.FILES:
             business.image = request.FILES['image']
+
+        # Geocode the address
+        lat, lng = geocode_address(business.address)
+        if lat and lng:
+            business.latitude = lat
+            business.longitude = lng
 
         business.save()
         messages.success(request, 'Business information updated successfully.')
         return redirect('business_portal')
 
-    return render(request, 'accounts/edit_business_info.html', {'business': business})
-
+    context = {
+        'business': business,
+        'GOOGLE_MAPS_API_KEY': settings.GOOGLE_MAPS_API_KEY,
+    }
+    return render(request, 'accounts/edit_business_info.html', context)
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse
@@ -938,3 +957,77 @@ def edit_service(request, business_id):
         'appointment_reasons': json.dumps(business.appointment_reasons),
     }
     return render(request, 'accounts/edit_service.html', context)
+
+def geocode_address(address):
+    api_key = settings.GOOGLE_MAPS_API_KEY
+    url = f'https://maps.googleapis.com/maps/api/geocode/json?address={address}&key={api_key}'
+    response = requests.get(url)
+    data = response.json()
+    if data['status'] == 'OK':
+        location = data['results'][0]['geometry']['location']
+        return location['lat'], location['lng']
+    return None, None
+
+
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+from django.contrib.auth import get_user_model
+from .models import Business, BusinessRolePermission
+import json
+
+@require_POST
+def update_staff_member(request, business_id, staff_id):
+    try:
+        business = Business.objects.get(id=business_id)
+        User = get_user_model()
+        staff_member = User.objects.get(id=staff_id)
+
+        # Check if the current user is associated with the business and has permission to edit staff
+        if not business.user_has_permission(request.user, 'can_edit_staff'):
+            return JsonResponse({'success': False, 'message': 'You do not have permission to edit staff members.'}, status=403)
+
+        # Parse the JSON data from the request body
+        data = json.loads(request.body)
+        new_email = data.get('email')
+        new_role = data.get('role')
+
+        # Get the current user's role
+        current_user_role = request.user.staff_role
+
+        # Check for invalid role changes
+        if current_user_role == 'OWNER':
+            # Owners can change any role
+            pass
+        elif current_user_role == 'MANAGER':
+            # Managers can't change owners or other managers, or promote to owner
+            if staff_member.staff_role in ['OWNER', 'MANAGER'] or new_role == 'OWNER':
+                return JsonResponse({'success': False, 'message': 'You do not have permission to change this role.'}, status=403)
+        elif current_user_role == 'WORKER':
+            # Workers can't change roles at all
+            return JsonResponse({'success': False, 'message': 'Workers cannot change staff roles.'}, status=403)
+        else:
+            return JsonResponse({'success': False, 'message': 'Invalid user role.'}, status=403)
+
+        # Prevent changing your own role
+        if request.user.id == staff_member.id and current_user_role != new_role:
+            return JsonResponse({'success': False, 'message': 'You cannot change your own role.'}, status=403)
+
+        # Update the staff member's email and role
+        staff_member.email = new_email
+        staff_member.staff_role = new_role
+        staff_member.save()
+
+        # Return the updated information
+        return JsonResponse({
+            'success': True,
+            'full_name': staff_member.get_full_name(),
+            'email': staff_member.email,
+            'role': staff_member.get_staff_role_display()
+        })
+
+    except Business.DoesNotExist:
+        return JsonResponse({'success': False, 'message': 'Business not found.'}, status=404)
+    except User.DoesNotExist:
+        return JsonResponse({'success': False, 'message': 'Staff member not found.'}, status=404)
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': str(e)}, status=500)

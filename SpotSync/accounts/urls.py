@@ -38,6 +38,7 @@ urlpatterns = [
     path('business/<int:business_id>/customers/', views.business_customer_list, name='business_customer_list'),
     path('update-booking-status/<str:booking_type>/<int:booking_id>/', views.update_booking_status, name='update_booking_status'),
     path('business/<int:business_id>/edit-service/', views.edit_service, name='edit_service'),
+    path('update-staff-member/<int:business_id>/<int:staff_id>/', views.update_staff_member, name='update_staff_member'),
 ]
 
 

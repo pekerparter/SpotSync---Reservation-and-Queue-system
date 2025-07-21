@@ -683,7 +683,8 @@ def add_staff_member(request, business_id):
         # Check if the user is already a staff member of this business
         if user.business == business and user.staff_role != 'CUSTOMER':
             return JsonResponse({"success": False, "message": "This user is already a staff member of this business."})
-        
+        if user.staff_role != 'CUSTOMER' and user.business != business:
+            return JsonResponse({"success": False, "message": "This user is already associated with another business."})
         # Update the user's business and role
         user.business = business
         user.staff_role = role

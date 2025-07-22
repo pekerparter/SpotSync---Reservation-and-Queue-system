@@ -85,7 +85,7 @@ DATABASES = {
     }
 }
 
-GOOGLE_MAPS_API_KEY = os.environ.get('AIzaSyAFzlMWUIi6p2iRFo_xIcbCwxqprLLN0Jc')
+GOOGLE_MAPS_API_KEY = os.environ.get('AIzaSyB-U-_hABXjiT6-tNfxRUoJCMtX5JK19nk')
 
 
 # Password validation

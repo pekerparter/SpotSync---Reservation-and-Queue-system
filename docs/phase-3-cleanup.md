@@ -102,6 +102,8 @@ future browser work, without changing application functionality here.
 | Ignore probes and tracked generated-file inventory | PASS; no tracked files remain in either generated directory |
 | Workflow validation, actionlint 1.7.7 | PASS; schema, expressions, events and action inputs checked locally |
 | Git diff whitespace check | PASS |
+| Clean committed source without generated directories, media, or snapshots | PASS; Django/JavaScript suites, lint, and static collection |
+| Remote GitHub Actions | PASS; [run 38782709602](https://github.com/pekerparter/SpotSync---Reservation-and-Queue-system/actions/runs/38782709602), verified completed/success for implementation commit e0cb8b3 |
 
 Local PostgreSQL uses a newly initialized isolated cluster/database under the
 workspace's scratch area; the disposable role/database contain synthetic test
@@ -112,8 +114,9 @@ CI/local system packages provide these prerequisites.
 
 ## Remaining work and limits
 
-- Remote GitHub Actions status must be assessed from an actual run after PR
-  creation. A local pass/actionlint validation is not a remote Actions pass.
+- Remote run 38782709602 passed every validation step. Later commits have their
+  own run status; check the current PR checks before merging. Local validation
+  alone is not evidence of a remote Actions pass.
 - Manually revoke old Maps credentials, apply separate API/referrer/IP
   restrictions, and rotate other historically exposed credentials. No new API
   credential is created or committed by this phase.

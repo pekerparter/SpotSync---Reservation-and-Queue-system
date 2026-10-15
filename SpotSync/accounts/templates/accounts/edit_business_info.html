@@ -14,7 +14,7 @@
                 <div class="md:flex md:space-x-8">
                     <div class="md:w-1/2">
                         <div class="mb-4">
-                            <img id="preview-image" class="h-48 w-full object-cover md:w-48 mb-2" src="{{ business.image.url }}" alt="{{ business.name }}">
+                            <img id="preview-image" class="h-48 w-full object-cover md:w-48 mb-2" {% if business.image %}src="{{ business.image.url }}"{% endif %} alt="{{ business.name }}">
                             <input type="file" name="image" id="image-upload" class="hidden" accept="image/*">
                             <label for="image-upload" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded cursor-pointer block text-center">
                                 Change Image

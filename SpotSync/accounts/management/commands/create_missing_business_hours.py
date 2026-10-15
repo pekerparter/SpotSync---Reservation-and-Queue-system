@@ -1,5 +1,6 @@
-from django.core.management.base import BaseCommand
 from accounts.models import Business
+from django.core.management.base import BaseCommand
+
 
 class Command(BaseCommand):
     help = 'Creates default business hours for businesses that dont have any'

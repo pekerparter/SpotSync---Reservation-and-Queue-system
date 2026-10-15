@@ -1,16 +1,14 @@
 from django.urls import path
-from .views import *
-from django.contrib.auth.views import LoginView, LogoutView
-from django.contrib.auth import views as auth_views
+
 from . import views
 
 urlpatterns = [
-    path('register/', register_view, name='register'),
-    path('login/', custom_login_view, name='custom_login'),
-    path('landing-page/', landing_page, name='landing_page'),
-    path('logout/', custom_logout, name='custom_logout'),
-     path('password_reset/', CustomPasswordResetView.as_view(), name='password_reset'),
-    path('set_new_password/', SetNewPasswordView.as_view(), name='set_new_password'),
+    path('register/', views.register_view, name='register'),
+    path('login/', views.custom_login_view, name='custom_login'),
+    path('landing-page/', views.landing_page, name='landing_page'),
+    path('logout/', views.custom_logout, name='custom_logout'),
+    path('password_reset/', views.CustomPasswordResetView.as_view(), name='password_reset'),
+    path('set_new_password/', views.SetNewPasswordView.as_view(), name='set_new_password'),
     path('categories/', views.categories, name='categories'),
     path('my-reservations/', views.my_reservations, name='my_reservations'),
     path('profile/', views.profile, name='profile'),
@@ -29,8 +27,8 @@ urlpatterns = [
     path('cancel-booking/<str:booking_type>/<int:booking_id>/', views.cancel_booking, name='cancel_booking'),
     path('booking/<str:booking_type>/<int:booking_id>/', views.booking_details, name='booking_details'),
     path('business-portal/', views.business_portal, name='business_portal'),
-    path('accounts/business/<int:business_id>/edit-staff/', edit_staff, name='edit_staff'),
-    path('business/<int:business_id>/add-staff/', add_staff_member, name='add_staff_member'),
+    path('accounts/business/<int:business_id>/edit-staff/', views.edit_staff, name='edit_staff'),
+    path('business/<int:business_id>/add-staff/', views.add_staff_member, name='add_staff_member'),
     path('get-role-permissions/<int:business_id>/', views.get_role_permissions, name='get_role_permissions'),
     path('update-role-permissions/<int:business_id>/', views.update_role_permissions, name='update_role_permissions'),
     path('delete-staff-member/<int:business_id>/<int:staff_id>/', views.delete_staff_member, name='delete_staff_member'),
@@ -40,6 +38,3 @@ urlpatterns = [
     path('business/<int:business_id>/edit-service/', views.edit_service, name='edit_service'),
     path('update-staff-member/<int:business_id>/<int:staff_id>/', views.update_staff_member, name='update_staff_member'),
 ]
-
-
-

@@ -1,19 +1,38 @@
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth import login, authenticate, get_user_model, logout
-from django.contrib.messages import get_messages
-from django.contrib.auth.forms import AuthenticationForm, SetPasswordForm
-from django.contrib import messages
-from django.contrib.auth.decorators import login_required
-from django.views import View
-from django.urls import reverse_lazy
+"""Customer bookings, queues, and business staff views."""
+
+import json
+import logging
 import uuid
-from django.db import IntegrityError
-from .models import *
-from .forms import CustomUserCreationForm, PasswordResetForm, UserProfileForm
-from django.utils import timezone
-from django.http import Http404
-from django.conf import settings
+from datetime import datetime, timedelta
+from itertools import chain
+
 import requests
+from django.conf import settings
+from django.contrib import messages
+from django.contrib.auth import authenticate, get_user_model, login, logout
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.auth.forms import AuthenticationForm, SetPasswordForm
+from django.contrib.auth.views import PasswordResetView
+from django.db import IntegrityError, transaction
+from django.http import Http404, HttpResponseForbidden, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse_lazy
+from django.utils import timezone
+from django.views import View
+from django.views.decorators.http import require_GET, require_POST
+
+from .forms import CustomPasswordResetForm, CustomUserCreationForm, UserProfileForm
+from .models import (
+    Appointment,
+    Business,
+    BusinessHours,
+    BusinessRolePermission,
+    Category,
+    CustomUser,
+    Queue,
+    Reservation,
+)
+
 
 def register_view(request):
     if request.method == 'POST':
@@ -60,8 +79,6 @@ def custom_login_view(request):
         form = AuthenticationForm()
     return render(request, 'accounts/login.html', {'form': form})
 
-from django.db.models import Q
-from django.utils import timezone
 
 @login_required
 def landing_page(request):
@@ -126,8 +143,6 @@ def booking_details(request, booking_type, booking_id):
     }
     return render(request, 'accounts/booking_details.html', context)
 
-from django.contrib.auth.views import PasswordResetView
-from .forms import CustomPasswordResetForm
 
 class CustomPasswordResetView(PasswordResetView):
     template_name = 'accounts/password_reset.html'
@@ -148,8 +163,6 @@ class SetNewPasswordView(View):
             return redirect('login')
         return render(request, 'accounts/set_new_password.html', {'form': form})
 
-from django.shortcuts import render, redirect
-from .models import Category, Business
 
 @login_required
 def categories(request):
@@ -157,19 +170,12 @@ def categories(request):
     return render(request, 'accounts/categories.html', {'categories': categories})
 
 
-from django.shortcuts import render, redirect, get_object_or_404
-from .models import Category, Business
 def view_all(request, category):
     category_obj = get_object_or_404(Category, name__iexact=category)
     businesses = category_obj.businesses.all()
     return render(request, 'accounts/view_all.html', {'category': category_obj, 'businesses': businesses})
 
 
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse
-from .models import Business, Queue, Category
-from django.db import transaction
 @login_required
 def business_detail(request, business_id):
     business = get_object_or_404(Business, id=business_id)
@@ -215,12 +221,6 @@ def business_detail(request, business_id):
         }
         return render(request, 'accounts/business_detail.html', context)
 
-from django.db import IntegrityError
-from django.http import JsonResponse
-from django.views.decorators.http import require_POST
-from .models import Business, Queue
-from django.utils import timezone
-from datetime import time
 
 @require_POST
 @login_required
@@ -292,13 +292,6 @@ def remove_from_queue(request, business_id):
             return JsonResponse({'status': 'error', 'message': 'Not in queue'})
         
             
-from django.shortcuts import render, get_object_or_404
-from django.http import JsonResponse
-from django.views.decorators.http import require_POST
-from django.contrib.auth.decorators import login_required
-from .models import Reservation, Appointment, Queue
-from itertools import chain
-import datetime
 
 @login_required
 def my_reservations(request):
@@ -334,10 +327,6 @@ def my_reservations(request):
 
     return render(request, 'accounts/my_reservations.html', {'bookings': bookings})
 
-from django.db import transaction
-from django.http import JsonResponse
-from django.shortcuts import get_object_or_404
-from .models import Reservation, Appointment, Queue, Business
 
 @require_POST
 @login_required
@@ -385,9 +374,6 @@ def profile(request):
 
     return render(request, 'accounts/profile.html', {'form': form})
 
-from django.http import JsonResponse
-from django.shortcuts import render, get_object_or_404
-from .models import Business
 
 @login_required
 def waiting_list(request, business_id):
@@ -422,16 +408,12 @@ def waiting_list(request, business_id):
 
 def reservation(request, business_id):
     business = get_object_or_404(Business, id=business_id)
-    today = timezone.localtime().date()
     context = {
         'business': business,
         'reservation_options': business.reservation_options or [],
         'GOOGLE_MAPS_API_KEY': settings.GOOGLE_MAPS_API_KEY,
     }
     return render(request, 'accounts/reservation.html', context)
-
-from django.views.decorators.http import require_GET, require_POST
-from datetime import datetime, timedelta
 
 
 @login_required
@@ -453,7 +435,7 @@ def make_reservation(request, business_id):
 
     if is_available:
         try:
-            reservation = Reservation.objects.create(
+            Reservation.objects.create(
                 business=business,
                 user=request.user,
                 date=date,
@@ -476,7 +458,6 @@ def appointment(request, business_id):
     return render(request, 'accounts/appointment.html', context)
 
 
-import logging
 logger = logging.getLogger(__name__)
 
 
@@ -612,7 +593,7 @@ def book_appointment(request, business_id):
         return JsonResponse({"success": False, "message": "This slot is already booked."})
 
     # Create the appointment
-    appointment = Appointment.objects.create(
+    Appointment.objects.create(
         business=business,
         user=request.user,
         date=date,
@@ -623,7 +604,6 @@ def book_appointment(request, business_id):
 
     return JsonResponse({"success": True, "message": "Appointment booked successfully!"})
 
-from django.contrib.auth.decorators import login_required, user_passes_test
 
 def is_business_staff(user):
     return user.is_business_staff
@@ -641,7 +621,6 @@ def business_portal(request):
     }
     return render(request, 'accounts/business_portal.html', context)
 
-from django.http import HttpResponseForbidden
 
 @login_required
 @user_passes_test(is_business_staff)
@@ -817,10 +796,6 @@ def edit_business_info(request, business_id):
         'GOOGLE_MAPS_API_KEY': settings.GOOGLE_MAPS_API_KEY,
     }
     return render(request, 'accounts/edit_business_info.html', context)
-from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, get_object_or_404, redirect
-from django.http import JsonResponse
-from django.views.decorators.http import require_POST
 
 @login_required
 @user_passes_test(is_business_staff)
@@ -876,14 +851,6 @@ def update_booking_status(request, booking_type, booking_id):
         return JsonResponse({'success': False, 'message': str(e)})
     
 
-
-from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib.auth.decorators import login_required, user_passes_test
-from django.db import transaction
-from django.http import JsonResponse
-from .models import Business, Category, BusinessHours
-from datetime import datetime
-import json
 
 @login_required
 @user_passes_test(lambda u: u.is_business_staff)
@@ -969,12 +936,6 @@ def geocode_address(address):
         return location['lat'], location['lng']
     return None, None
 
-
-from django.http import JsonResponse
-from django.views.decorators.http import require_POST
-from django.contrib.auth import get_user_model
-from .models import Business, BusinessRolePermission
-import json
 
 @require_POST
 def update_staff_member(request, business_id, staff_id):

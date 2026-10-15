@@ -12,7 +12,9 @@
         <div class="bg-white rounded-lg shadow-md overflow-hidden">
             <div class="md:flex">
                 <div class="md:flex-shrink-0">
-                    <img class="h-48 w-full object-cover md:w-48" src="{{ business.image.url }}" alt="{{ business.name }}">
+                    {% if business.image %}
+                        <img class="h-48 w-full object-cover md:w-48" src="{{ business.image.url }}" alt="{{ business.name }}">
+                    {% endif %}
                 </div>
                 <div class="p-8">
                     <div class="uppercase tracking-wide text-sm text-indigo-500 font-semibold">{{ business.name }}</div>

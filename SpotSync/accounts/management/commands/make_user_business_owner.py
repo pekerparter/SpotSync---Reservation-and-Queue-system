@@ -1,7 +1,7 @@
-
-from django.core.management.base import BaseCommand
+from accounts.models import Business, BusinessRolePermission
 from django.contrib.auth import get_user_model
-from accounts.models import Business, CustomUser, BusinessRolePermission
+from django.core.management.base import BaseCommand
+
 
 class Command(BaseCommand):
     help = 'Make an existing user the owner of a business using IDs'
@@ -54,12 +54,12 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(f'Successfully made user (ID: {user_id}) the owner of business (ID: {business_id})'))
 
         # Display user and business details for confirmation
-        self.stdout.write(f"\nUser Details:")
+        self.stdout.write("\nUser Details:")
         self.stdout.write(f"ID: {user.id}")
         self.stdout.write(f"Username: {user.username}")
         self.stdout.write(f"Email: {user.email}")
         self.stdout.write(f"Staff Role: {user.get_staff_role_display()}")
 
-        self.stdout.write(f"\nBusiness Details:")
+        self.stdout.write("\nBusiness Details:")
         self.stdout.write(f"ID: {business.id}")
         self.stdout.write(f"Name: {business.name}")

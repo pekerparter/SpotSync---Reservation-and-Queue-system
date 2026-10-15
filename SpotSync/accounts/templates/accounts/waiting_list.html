@@ -102,7 +102,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 function initMap() {
-    var location = {lat: {{ business.latitude }}, lng: {{ business.longitude }}};
+    var location = {lat: {{ business.latitude|default_if_none:'null' }}, lng: {{ business.longitude|default_if_none:'null' }}};
+        if (!document.getElementById('map') || location.lat === null || location.lng === null) return;
     var map = new google.maps.Map(document.getElementById('map'), {
         zoom: 15,
         center: location
@@ -115,10 +116,12 @@ function initMap() {
 
 // Call initMap when the page loads
 if (document.getElementById('map')) {
-    initMap();
+
 }
 </script>
 
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB-U-_hABXjiT6-tNfxRUoJCMtX5JK19nk&libraries=places&callback=initMap" async defer></script>
+{% if GOOGLE_MAPS_BROWSER_API_KEY %}
+<script src="https://maps.googleapis.com/maps/api/js?key={{ GOOGLE_MAPS_BROWSER_API_KEY|urlencode }}&libraries=places&callback=initMap" async defer></script>
+{% endif %}
 
 {% endblock %}

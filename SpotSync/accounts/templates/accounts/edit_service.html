@@ -1,5 +1,6 @@
 
 {% extends 'base.html' %}
+{% load static %}
 
 {% block content %}
 <div class="bg-gray-100 min-h-screen py-12">
@@ -161,6 +162,7 @@
     </div>
 </div>
 
+<script src="{% static 'accounts/js/escape_html.js' %}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     function updateVisibility() {
@@ -197,7 +199,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const span = document.createElement('span');
             span.className = 'bg-blue-100 text-blue-800 text-sm font-medium mr-2 px-2.5 py-0.5 rounded flex items-center';
             span.innerHTML = `
-                ${value}
+                ${spotSyncEscapeHtml(value)}
                 <button type="button" class="ml-2 text-blue-600 hover:text-blue-800 focus:outline-none delete-item">
                     ×
                 </button>
@@ -256,7 +258,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const span = document.createElement('span');
             span.className = 'bg-blue-100 text-blue-800 text-sm font-medium mr-2 px-2.5 py-0.5 rounded flex items-center';
             span.innerHTML = `
-                ${item}
+                ${spotSyncEscapeHtml(item)}
                 <button type="button" class="ml-2 text-blue-600 hover:text-blue-800 focus:outline-none delete-item">
                     ×
                 </button>

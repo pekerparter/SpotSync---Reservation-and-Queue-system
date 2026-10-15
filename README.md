@@ -5,9 +5,10 @@ appointments. Customers can register, browse businesses, join queues, manage
 bookings, and update their profiles. Business staff can manage services, hours,
 staff roles, permissions, and customer bookings.
 
-This repository currently has development settings and known security issues.
-Read [the audit and cleanup plan](docs/cleanup-plan.md) before deploying it or
-loading historical database exports.
+This repository defaults to local development settings. Read the
+[security changes and rollout requirements](docs/security-hardening.md) and
+[cleanup plan](docs/cleanup-plan.md) before deploying it or loading historical
+database exports.
 
 ## Structure
 
@@ -56,35 +57,24 @@ needs `CREATEDB` to run Django's tests, which create a separate test database.
 Do not restore the checked-in SQLite database or JSON exports automatically:
 they are historical snapshots with user/session data and may have old schemas.
 
-The default settings use a local database named `spotsync` and role
-`spotsync_user`. They contain legacy development credentials and do **not** read
-standard PostgreSQL environment variables. To supply private local credentials
-without editing tracked settings, create the ignored file
-`SpotSync/SpotSync/local_settings.py`:
+The default database name is `spotsync`, with role `spotsync_user` at
+`localhost:5432`. Settings now read `PGDATABASE`, `PGUSER`, `PGPASSWORD`, `PGHOST`,
+and `PGPORT`. Supply the password through your private process environment;
+there is no hardcoded password fallback. An empty password works only where the
+local PostgreSQL authentication policy permits it.
 
-```python
-import os
+Set `SPOTSYNC_SECRET_KEY` privately to a cryptographically random Django signing
+key. Keep it stable across server processes and restarts. In development only,
+an unset key produces an ephemeral random key, so sessions/reset tokens will
+not survive a process restart. `SPOTSYNC_DEBUG=false` requires an explicit key.
+The prepared cloud setup retains a private development key outside the checkout;
+see its saved startup instructions. No key value belongs in Git or this README.
+Existing ignored `SpotSync/SpotSync/local_settings.py` overrides remain supported
+through `DJANGO_SETTINGS_MODULE=SpotSync.local_settings`.
 
-from .settings import *  # Local override of the project's development settings.
-
-SECRET_KEY = os.environ["SPOTSYNC_SECRET_KEY"]
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ.get("PGDATABASE", "spotsync"),
-        "USER": os.environ.get("PGUSER", "spotsync_user"),
-        "PASSWORD": os.environ.get("PGPASSWORD", ""),
-        "HOST": os.environ.get("PGHOST", "127.0.0.1"),
-        "PORT": os.environ.get("PGPORT", "5432"),
-    }
-}
-```
-
-Set `SPOTSYNC_SECRET_KEY` and any required database credentials through your
-private environment or secret manager, then select the override module:
+With credentials supplied privately, run from the repository root:
 
 ```sh
-export DJANGO_SETTINGS_MODULE=SpotSync.local_settings
 cd SpotSync
 python manage.py migrate --noinput
 python manage.py check
@@ -121,12 +111,21 @@ python manage.py makemigrations --check --dry-run
 python manage.py migrate --check
 ```
 
-The tests cover accounts, booking creation/cancellation, slot availability,
-queues, staff page rendering, and existing route aliases. They run against a
+The tests cover accounts, business-scoped authorization, role escalation,
+booking validation/concurrency, queue consistency, private configuration, staff
+page rendering, and existing route aliases. PostgreSQL concurrency tests use
+independent database connections; SQLite skips tests that require row locks. They run against a
 temporary database and do not load historical snapshots or call Google APIs.
 They do not establish that every authorization path or browser interaction is
 secure. `python manage.py check --deploy` currently reports deployment warnings;
 production settings and security fixes remain separate work.
+
+Run the small browser escaping regression suite from the repository root with
+Node 18 or later (no npm installation is needed):
+
+```sh
+node --test tests/security.test.cjs
+```
 
 There was no existing linter or CI configuration. For the cleanup's targeted
 Python check, optionally run Ruff 0.14.0 from the repository root:
@@ -140,10 +139,17 @@ For deployment, `python manage.py collectstatic --noinput` regenerates
 
 ## Google Maps and deployment limitations
 
-The current templates embed a legacy Maps key, while server geocoding looks up
-an incorrectly named environment variable. A conventional `GOOGLE_MAPS_API_KEY`
-binding alone does not fix the current implementation. Rotate/restrict the
-existing key and migrate all map consumers together in the security phase.
+Set `GOOGLE_MAPS_API_KEY` privately for server-side geocoding, and configure a
+separate `GOOGLE_MAPS_BROWSER_API_KEY` for the browser SDK. Browser keys are
+visible to visitors by design: restrict them to the appropriate HTTP referrers
+and Maps APIs. The server key is never used as a browser fallback. Without a
+browser key, the SDK is omitted; without a server key, geocoding is skipped and
+existing/manual coordinates remain available. Geocoding failure does not block
+business information updates. Live key validity and restrictions were not tested.
+
+The former embedded keys were removed from current application configuration
+and templates. Their copies in Git history and historical session/user exports
+remain sensitive: operators must rotate/restrict credentials and review retention.
 Do not put replacement keys, passwords, database dumps, or private `.env` files
-in Git. The local override above is for development, not a production deployment
-configuration. See [the prioritized follow-up work](docs/cleanup-plan.md).
+in Git. Development defaults are not a production deployment configuration.
+See [the security rollout notes](docs/security-hardening.md).

@@ -1,0 +1,2 @@
+-r SpotSync/requirements.txt
+ruff==0.14.0

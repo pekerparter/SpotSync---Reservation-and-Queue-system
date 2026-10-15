@@ -1,0 +1,7 @@
+[tool.ruff]
+target-version = "py312"
+extend-exclude = ["SpotSync/staticfiles", "SpotSync/accounts/migrations", "work"]
+
+[tool.ruff.lint]
+# Preserve phase one's undefined/unused-name checks without a formatting refactor.
+select = ["F"]

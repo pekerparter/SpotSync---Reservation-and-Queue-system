@@ -15,8 +15,16 @@ SpotSync/SpotSync/local_settings.py
 # Development tools and editor files
 .ruff_cache/
 .coverage
+.coverage.*
+coverage.xml
 htmlcov/
 .pytest_cache/
+.mypy_cache/
+.tox/
+.nox/
+build/
+dist/
+*.egg-info/
 .ipynb_checkpoints/
 .vscode/
 .idea/
@@ -27,9 +35,10 @@ Thumbs.db
 *~
 *.log
 node_modules/
+/work/
 
 # Local databases, exports, uploads, and collectstatic output.
-# Existing tracked files remain tracked; see docs/cleanup-plan.md.
+# Existing data/media remain tracked; see docs/phase-3-cleanup.md.
 *.sqlite3
 *.sqlite3-*
 /SpotSync/*.json

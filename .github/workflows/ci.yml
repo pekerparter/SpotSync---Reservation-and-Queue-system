@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: spotsync_ci
+          POSTGRES_USER: spotsync_ci
+          # Disposable runner-local service only; this is not a deployment secret.
+          POSTGRES_PASSWORD: spotsync_ci_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U spotsync_ci -d spotsync_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DJANGO_SETTINGS_MODULE: SpotSync.ci_settings
+      SPOTSYNC_DEBUG: 'true'
+      PGDATABASE: spotsync_ci
+      PGUSER: spotsync_ci
+      PGPASSWORD: spotsync_ci_disposable
+      PGHOST: 127.0.0.1
+      PGPORT: '5432'
+      GOOGLE_MAPS_API_KEY: ''
+      GOOGLE_MAPS_BROWSER_API_KEY: ''
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            SpotSync/requirements.txt
+            requirements-dev.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install PostgreSQL build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends build-essential libpq-dev
+      - name: Install Python dependencies
+        run: |
+          python -m pip install -r requirements-dev.txt
+          python -m pip check
+      - name: Initialize isolated test configuration
+        shell: python
+        run: |
+          import os
+          import secrets
+          from pathlib import Path
+          key = secrets.token_urlsafe(64)
+          print(f'::add-mask::{key}')
+          with open(os.environ['GITHUB_ENV'], 'a') as env_file:
+              env_file.write(f'SPOTSYNC_SECRET_KEY={key}\n')
+              output_dir = Path(os.environ['RUNNER_TEMP']) / 'spotsync-ci'
+              env_file.write(f'SPOTSYNC_CI_OUTPUT_DIR={output_dir}\n')
+      - name: Ruff lint checks
+        run: |
+          ruff check .
+          ruff check SpotSync/accounts --select I
+      - name: JavaScript regression tests
+        run: node --test tests/*.test.cjs
+      - name: Django configuration and migration checks
+        working-directory: SpotSync
+        run: |
+          python manage.py check --fail-level WARNING
+          python manage.py makemigrations --check --dry-run
+          python manage.py migrate --noinput
+          python manage.py migrate --check
+      - name: Django regression and PostgreSQL concurrency tests
+        working-directory: SpotSync
+        run: python manage.py test --noinput --verbosity 2
+      - name: Verify static collection
+        working-directory: SpotSync
+        run: python manage.py collectstatic --noinput

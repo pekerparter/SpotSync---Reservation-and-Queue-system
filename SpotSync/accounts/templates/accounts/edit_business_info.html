@@ -144,8 +144,10 @@
             }, 3000);
         }
     }
-    initMap();
+
 </script>
 
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB-U-_hABXjiT6-tNfxRUoJCMtX5JK19nk&libraries=places&callback=initMap" async defer></script>
+{% if GOOGLE_MAPS_BROWSER_API_KEY %}
+<script src="https://maps.googleapis.com/maps/api/js?key={{ GOOGLE_MAPS_BROWSER_API_KEY|urlencode }}&libraries=places&callback=initMap" async defer></script>
+{% endif %}
 {% endblock %}

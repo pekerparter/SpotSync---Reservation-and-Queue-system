@@ -112,6 +112,7 @@
     </div>
 </div>
 
+<script src="{% static 'accounts/js/escape_html.js' %}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const businessId = {{ business.id }};
@@ -276,11 +277,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 const newStaffHtml = `
                     <div class="bg-blue-100 p-4 rounded mb-2 flex justify-between items-center">
                         <div>
-                            <span class="font-semibold">${data.full_name}</span>
-                            <span class="text-gray-600 ml-2">${data.email}</span>
-                            <span class="bg-blue-500 text-white px-2 py-1 rounded ml-2">${data.role}</span>
+                            <span class="font-semibold">${spotSyncEscapeHtml(data.full_name)}</span>
+                            <span class="text-gray-600 ml-2">${spotSyncEscapeHtml(data.email)}</span>
+                            <span class="bg-blue-500 text-white px-2 py-1 rounded ml-2">${spotSyncEscapeHtml(data.role)}</span>
                         </div>
-                        <button class="delete-staff bg-red-500 text-white px-4 py-2 rounded" data-staff-id="${data.staff_id}">Delete</button>
+                        <button class="delete-staff bg-red-500 text-white px-4 py-2 rounded" data-staff-id="${spotSyncEscapeHtml(data.staff_id)}">Delete</button>
                     </div>
                 `;
                 staffList.insertAdjacentHTML('afterbegin', newStaffHtml);
@@ -321,7 +322,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
         // Replace info with editable fields
         staffInfo.innerHTML = `
-            <input type="email" class="edit-email border rounded px-2 py-1 mr-2" value="${email}">
+            <input type="email" class="edit-email border rounded px-2 py-1 mr-2" value="${spotSyncEscapeHtml(email)}">
             <select class="edit-role border rounded px-2 py-1">
                 <option value="WORKER" ${role === 'Worker' ? 'selected' : ''}>Worker</option>
                 <option value="MANAGER" ${role === 'Manager' ? 'selected' : ''}>Manager</option>
@@ -358,9 +359,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.success) {
                     // Update the staff info
                     staffInfo.innerHTML = `
-                        <span class="font-semibold staff-name">${data.full_name}</span>
-                        <span class="text-gray-600 ml-2 staff-email">${newEmail}</span>
-                        <span class="bg-blue-500 text-white px-2 py-1 rounded ml-2 staff-role">${data.role}</span>
+                        <span class="font-semibold staff-name">${spotSyncEscapeHtml(data.full_name)}</span>
+                        <span class="text-gray-600 ml-2 staff-email">${spotSyncEscapeHtml(newEmail)}</span>
+                        <span class="bg-blue-500 text-white px-2 py-1 rounded ml-2 staff-role">${spotSyncEscapeHtml(data.role)}</span>
                     `;
                     // Restore original actions
                     restoreOriginalActions(staffActions, staffId);
@@ -378,9 +379,9 @@ document.addEventListener('DOMContentLoaded', function() {
         staffActions.querySelector('.discard-edit').addEventListener('click', function() {
             // Restore original info
             staffInfo.innerHTML = `
-                <span class="font-semibold staff-name">${staffDiv.dataset.originalName}</span>
-                <span class="text-gray-600 ml-2 staff-email">${staffDiv.dataset.originalEmail}</span>
-                <span class="bg-blue-500 text-white px-2 py-1 rounded ml-2 staff-role">${staffDiv.dataset.originalRole}</span>
+                <span class="font-semibold staff-name">${spotSyncEscapeHtml(staffDiv.dataset.originalName)}</span>
+                <span class="text-gray-600 ml-2 staff-email">${spotSyncEscapeHtml(staffDiv.dataset.originalEmail)}</span>
+                <span class="bg-blue-500 text-white px-2 py-1 rounded ml-2 staff-role">${spotSyncEscapeHtml(staffDiv.dataset.originalRole)}</span>
             `;
             // Restore original actions
             restoreOriginalActions(staffActions, staffId);
@@ -395,7 +396,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <button class="edit-staff bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded mr-2">
                 Edit
             </button>
-            <button class="delete-staff bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded" data-staff-id="${staffId}">
+            <button class="delete-staff bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded" data-staff-id="${spotSyncEscapeHtml(staffId)}">
                 Delete
             </button>
         `;

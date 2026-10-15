@@ -10,8 +10,11 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
-from pathlib import Path
 import os
+from pathlib import Path
+
+from django.core.exceptions import ImproperlyConfigured
+from django.core.management.utils import get_random_secret_key
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,10 +23,16 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-t+*%wx))3(8l+2hyvgwk*7l46cpquest8of_&i9irv6fuym896'
+SECRET_KEY = os.environ.get('SPOTSYNC_SECRET_KEY')
+if not SECRET_KEY:
+    if os.environ.get('SPOTSYNC_DEBUG', 'true').lower() not in {'true', '1', 'yes'}:
+        raise ImproperlyConfigured('SPOTSYNC_SECRET_KEY is required when debug is disabled.')
+    # Development only: no shared credential is stored in source control.
+    # Configure SPOTSYNC_SECRET_KEY to retain sessions across process restarts.
+    SECRET_KEY = get_random_secret_key()
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('SPOTSYNC_DEBUG', 'true').lower() in {'true', '1', 'yes'}
 
 ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 
@@ -60,6 +69,7 @@ TEMPLATES = [
             'context_processors': [
                 'django.template.context_processors.debug',
                 'django.template.context_processors.request',
+                'accounts.context_processors.maps',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
             ],
@@ -77,15 +87,18 @@ WSGI_APPLICATION = 'SpotSync.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'spotsync',
-        'USER': 'spotsync_user',
-        'PASSWORD': 'potatomilk',
-        'HOST': 'localhost',
-        'PORT': '5432',
+        'NAME': os.environ.get('PGDATABASE', 'spotsync'),
+        'USER': os.environ.get('PGUSER', 'spotsync_user'),
+        'PASSWORD': os.environ.get('PGPASSWORD', ''),
+        'HOST': os.environ.get('PGHOST', 'localhost'),
+        'PORT': os.environ.get('PGPORT', '5432'),
     }
 }
 
-GOOGLE_MAPS_API_KEY = os.environ.get('AIzaSyB-U-_hABXjiT6-tNfxRUoJCMtX5JK19nk')
+GOOGLE_MAPS_API_KEY = os.environ.get('GOOGLE_MAPS_API_KEY', '')
+# Browser keys are public by design and must have referrer/API restrictions.
+# Do not fall back to the server credential in rendered HTML.
+GOOGLE_MAPS_BROWSER_API_KEY = os.environ.get('GOOGLE_MAPS_BROWSER_API_KEY', '')
 
 
 # Password validation

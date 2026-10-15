@@ -19,7 +19,7 @@ class CustomUser(AbstractUser):
 
     @property
     def is_business_staff(self):
-        return self.staff_role != 'CUSTOMER' and self.business is not None
+        return self.staff_role in {'OWNER', 'MANAGER', 'WORKER'} and self.business_id is not None
     
     def __str__(self):
         return f"{self.username} - {self.get_staff_role_display()}"
@@ -106,8 +106,17 @@ class Business(models.Model):
             return None
 
     def user_has_permission(self, user, permission):
+        if not user.is_authenticated or not user.is_active:
+            return False
         if user.is_superuser:
             return True
+        if not user.is_business_staff or user.business_id != self.pk:
+            return False
+        if permission not in {
+            'can_edit_info', 'can_edit_staff', 'can_display_customers',
+            'can_edit_availability', 'can_edit_service',
+        }:
+            return False
         role_permissions = self.get_role_permissions(user.staff_role)
         return getattr(role_permissions, permission, False) if role_permissions else False
 
@@ -120,21 +129,21 @@ class Business(models.Model):
     
     def update_queue_positions(self):
         with transaction.atomic():
-            queues = list(self.queue_set.filter(status='in_queue').order_by('created_at'))
-            
-            updated_queues = []
-            for index, queue in enumerate(queues, start=1):
-                if queue.position != index:
-                    queue.position = index
-                    updated_queues.append(queue)
-            
-            if updated_queues:
-                Queue.objects.bulk_update(updated_queues, ['position'])
-            
-            active_queue_count = len(queues)
-            if self.people_in_queue != active_queue_count:
-                self.people_in_queue = active_queue_count
-                self.save(update_fields=['people_in_queue'])
+            current = Business.objects.select_for_update().get(pk=self.pk)
+            queues = list(self.queue_set.filter(status='in_queue').order_by('created_at', 'pk'))
+            minutes = current.time_per_customer if current.enable_time_estimation else 0
+            minutes = minutes or 0
+            updated = []
+            for position, queue in enumerate(queues, start=1):
+                estimate = position * minutes
+                if queue.position != position or queue.estimated_wait_time != estimate:
+                    queue.position, queue.estimated_wait_time = position, estimate
+                    updated.append(queue)
+            if updated:
+                Queue.objects.bulk_update(updated, ['position', 'estimated_wait_time'])
+            self.people_in_queue = len(queues)
+            self.estimated_wait_time = len(queues) * minutes
+            self.save(update_fields=['people_in_queue', 'estimated_wait_time'])
 
     def update_people_in_queue(self):
         active_queue_count = self.queue_set.filter(status='in_queue').count()
@@ -163,29 +172,26 @@ class Queue(models.Model):
     ])
 
     def save(self, *args, **kwargs):
-        if not self.pk and self.status == 'in_queue':
-            # Cancel any existing 'in_queue' entries for this user and business
-            Queue.objects.filter(
-                business=self.business,
-                user=self.user,
-                status='in_queue'
-            ).update(status='cancelled')
-    
-            # Set the position for the new entry
-            self.position = self.business.get_next_queue_position()
-    
-            # Calculate estimated wait time
-            if self.business.enable_time_estimation and self.business.time_per_customer:
-                self.estimated_wait_time = self.position * self.business.time_per_customer
-    
-        super().save(*args, **kwargs)
-        self.business.update_people_in_queue()
-        self.business.update_estimated_wait_time()
+        with transaction.atomic():
+            business = Business.objects.select_for_update().get(pk=self.business_id)
+            previous_status = None
+            if self.pk:
+                previous_status = Queue.objects.filter(pk=self.pk).values_list('status', flat=True).first()
+            if self.status == 'in_queue' and previous_status != 'in_queue':
+                # Keep the historical replacement behavior for direct model
+                # creation while serializing it with customer queue requests.
+                Queue.objects.filter(business=business, user=self.user, status='in_queue').exclude(pk=self.pk).update(status='cancelled')
+                self.position = business.get_next_queue_position()
+            super().save(*args, **kwargs)
+            business.update_queue_positions()
+            self.refresh_from_db(fields=['position', 'estimated_wait_time'])
+            self.business = business
 
     def delete(self, *args, **kwargs):
-        business = self.business
-        super().delete(*args, **kwargs)
-        business.update_queue_positions()
+        with transaction.atomic():
+            business = Business.objects.select_for_update().get(pk=self.business_id)
+            super().delete(*args, **kwargs)
+            business.update_queue_positions()
 
     class Meta:
         indexes = [

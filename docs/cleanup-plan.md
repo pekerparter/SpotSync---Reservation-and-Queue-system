@@ -1,5 +1,12 @@
 # Repository audit and cleanup plan
 
+Phase two now addresses business authorization, runtime credential configuration,
+vulnerable dependency pins, booking validation, and queue concurrency. See
+[security hardening and remaining operator actions](security-hardening.md). The
+baseline findings below are retained as the historical audit, not a statement
+that every listed defect remains unfixed. Cancelled-reservation schema repair,
+historical-data retention, and bulk generated-artifact removal remain deferred.
+
 Audited at baseline `694ace7` on 2026-10-15. Phase one deliberately preserves
 URL paths/names, model fields, migrations, status values, permissions behavior,
 and booking rules. Findings below distinguish confirmed failures from risks

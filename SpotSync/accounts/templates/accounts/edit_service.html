@@ -187,12 +187,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initial visibility update
     updateVisibility();
 
-    // Function to update the hidden input with JSON data
-    function updateHiddenInput(listId, hiddenInputId) {
-        const items = Array.from(document.getElementById(listId).children).map(span => span.textContent.trim());
-        document.getElementById(hiddenInputId).value = JSON.stringify(items);
-    }
-
     // Function to add an item (option or reason)
     function addItem(inputId, listId, hiddenInputId) {
         const input = document.getElementById(inputId);

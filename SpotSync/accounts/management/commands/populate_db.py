@@ -1,8 +1,10 @@
-from django.core.management.base import BaseCommand
-from accounts.models import Category, Business
-from django.core.files import File
-from django.conf import settings
 import os
+
+from accounts.models import Business, Category
+from django.conf import settings
+from django.core.files import File
+from django.core.management.base import BaseCommand
+
 
 class Command(BaseCommand):
     help = 'Populate the database with sample businesses'

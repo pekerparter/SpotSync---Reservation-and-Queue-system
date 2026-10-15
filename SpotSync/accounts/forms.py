@@ -1,8 +1,8 @@
 from django import forms
-from django.contrib.auth.forms import UserCreationForm, PasswordResetForm
-from .models import CustomUser, Business
-from django.contrib.auth.models import User
-from django.contrib.auth.forms import PasswordResetForm
+from django.contrib.auth.forms import PasswordResetForm, UserCreationForm
+
+from .models import Business, CustomUser
+
 
 class CustomUserCreationForm(UserCreationForm):
     password1 = forms.CharField(

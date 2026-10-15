@@ -1,6 +1,8 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import CustomUser, Category, Queue, Business, BusinessRolePermission
+
+from .models import Business, BusinessRolePermission, Category, CustomUser, Queue
+
 
 class BusinessRolePermissionInline(admin.TabularInline):
     model = BusinessRolePermission

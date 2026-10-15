@@ -1,8 +1,9 @@
-from django.db import models, transaction
 from django.contrib.auth.models import AbstractUser, UserManager
-from django.utils import timezone
+from django.db import models, transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.utils import timezone
+
 
 class CustomUser(AbstractUser):
     STAFF_ROLES = [
@@ -88,14 +89,6 @@ class Business(models.Model):
                 closing_time='17:00'
             )
 
-    
-    def update_people_in_queue(self):
-        active_queue_count = self.queue_set.filter(status='in_queue').count()
-        if self.people_in_queue != active_queue_count:
-            self.people_in_queue = active_queue_count
-            self.save(update_fields=['people_in_queue'])
-        
-        return self.people_in_queue
     def get_people_in_queue(self):
         return self.update_people_in_queue()
     

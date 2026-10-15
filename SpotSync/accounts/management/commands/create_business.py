@@ -1,9 +1,7 @@
-
-from django.core.management.base import BaseCommand
 from accounts.models import Business, Category
 from django.core.exceptions import ValidationError
-from django.utils.timezone import make_aware
-from datetime import datetime
+from django.core.management.base import BaseCommand
+
 
 class Command(BaseCommand):
     help = 'Creates a new business entry'
